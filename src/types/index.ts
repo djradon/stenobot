@@ -90,7 +90,7 @@ export interface CloggerConfig {
     string,
     {
       enabled: boolean;
-      sessionPath?: string;
+      sessionPaths?: string[];
       exportPath?: string;
     }
   >;

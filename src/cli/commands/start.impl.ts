@@ -13,7 +13,7 @@ export async function startImpl(
   this.process.stdout.write("Starting clogger daemon...\n");
 
   const config = await loadConfig();
-  const registry = new ProviderRegistry();
+  const registry = new ProviderRegistry(config);
   const state = new StateManager();
   const monitor = new SessionMonitor(registry, state, config);
 

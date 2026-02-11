@@ -9,7 +9,10 @@ const DEFAULT_CONFIG: CloggerConfig = {
   providers: {
     "claude-code": {
       enabled: true,
-      sessionPath: "~/.claude/projects/",
+      sessionPaths: [
+        "~/.claude/projects/",
+        "~/.claude-personal/projects/",
+      ],
     },
   },
   outputDirectory: "~/clogger-output",

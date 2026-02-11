@@ -6,8 +6,10 @@ import { parseClaudeMessages } from "./parser.js";
 export class ClaudeCodeProvider implements Provider {
   readonly name = "claude-code";
 
+  constructor(private readonly sessionPaths?: string[]) {}
+
   discoverSessions(): AsyncIterable<Session> {
-    return discoverClaudeSessions();
+    return discoverClaudeSessions(this.sessionPaths);
   }
 
   parseMessages(

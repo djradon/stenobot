@@ -2,21 +2,32 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
 import type { Session } from "../../types/index.js";
+import { expandHome } from "../../utils/paths.js";
 
-/** Default Claude Code projects directory */
-function getClaudeProjectsDir(): string {
-  return path.join(os.homedir(), ".claude", "projects");
+/** Default Claude Code session directories */
+const DEFAULT_SESSION_PATHS = [
+  path.join(os.homedir(), ".claude", "projects"),
+  path.join(os.homedir(), ".claude-personal", "projects"),
+];
+
+/** Discover active Claude Code sessions by scanning project directories */
+export async function* discoverClaudeSessions(
+  sessionPaths?: string[],
+): AsyncIterable<Session> {
+  const dirs = sessionPaths?.map(expandHome) ?? DEFAULT_SESSION_PATHS;
+
+  for (const projectsDir of dirs) {
+    yield* scanProjectsDir(projectsDir);
+  }
 }
 
-/** Discover active Claude Code sessions by scanning the projects directory */
-export async function* discoverClaudeSessions(): AsyncIterable<Session> {
-  const projectsDir = getClaudeProjectsDir();
-
+/** Scan a single projects directory for sessions */
+async function* scanProjectsDir(projectsDir: string): AsyncIterable<Session> {
   let projectDirs: string[];
   try {
     projectDirs = await fs.readdir(projectsDir);
   } catch {
-    return; // Directory doesn't exist — no sessions
+    return; // Directory doesn't exist — skip
   }
 
   for (const projectDir of projectDirs) {
@@ -24,14 +35,14 @@ export async function* discoverClaudeSessions(): AsyncIterable<Session> {
     const stat = await fs.stat(projectPath).catch(() => null);
     if (!stat?.isDirectory()) continue;
 
-    let sessionFiles: string[];
+    let entries: string[];
     try {
-      sessionFiles = await fs.readdir(projectPath);
+      entries = await fs.readdir(projectPath);
     } catch {
       continue;
     }
 
-    for (const file of sessionFiles) {
+    for (const file of entries) {
       if (!file.endsWith(".jsonl")) continue;
 
       const filePath = path.join(projectPath, file);

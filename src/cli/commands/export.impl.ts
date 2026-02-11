@@ -19,7 +19,7 @@ export async function exportImpl(
   sessionId: string,
 ): Promise<void> {
   const config = await loadConfig();
-  const registry = new ProviderRegistry();
+  const registry = new ProviderRegistry(config);
 
   // Find the session across all providers
   let sessionFilePath: string | undefined;
