@@ -1565,3 +1565,74 @@ Also, we could reduce a lot of unnecessary headings by aggregating all subsequen
 # claude-opus-4.6_2026-02-12_0744_44
 
 Let me look at the exported file and the exporter code.
+
+# claude-opus-4.6_2026-02-12_0748_03
+
+Good observations. Both issues are related to how the exporter handles consecutive same-role messages. Let me look at the specific patterns in the exported file and then fix both.
+
+# claude-opus-4.6_2026-02-12_0748_13
+
+Looking at the exported file, I can see the two problems clearly:
+
+1. **Blank lines**: `formatMessage` always pushes content (even empty string) + `renderToString` adds a separator after each message, producing 2-3 blank lines between empty-content turns.
+
+2. **Redundant headings**: Lines like 860-946 show many separate Claude headings in rapid succession (0118_27, 0118_30, 0118_30, 0118_34, etc.) — these are all Claude turns without a user turn in between and should be grouped under one heading.
+
+Both fixes go into the exporter. I'll:
+- Add an `includeHeading` option to `formatMessage`
+- Track `lastRole` in `renderToString` to skip headings for consecutive same-role messages  
+- Collapse excessive blank lines in `formatMessage` output
+
+
+# claude-opus-4.6_2026-02-12_0748_34
+
+Now update `renderToString` to aggregate consecutive same-role messages:
+
+
+
+
+# claude-opus-4.6_2026-02-12_0748_55
+
+All 53 tests pass. Let me verify the build is clean too, then do a quick sanity check on the actual export output.
+
+# claude-opus-4.6_2026-02-12_0749_00
+
+Now let me test the real export to verify the output improvements:
+
+
+
+# claude-opus-4.6_2026-02-12_0749_10
+
+Let me check the key sections — the area around lines 860-946 in the original file had many empty/redundant Claude headings:
+
+
+
+
+# claude-opus-4.6_2026-02-12_0749_28
+
+181 headings down to 95 — nearly half as many. Let me check the problem areas from the original file:
+
+
+
+
+
+
+# claude-opus-4.6_2026-02-12_0749_54
+
+Let me check the specific section that had many empty Claude turns:
+
+
+# claude-opus-4.6_2026-02-12_0750_00
+
+The previously-problematic section (lines 860-946 in the old export with ~15 separate Claude headings) is now merged into a single heading at line 838. Let me also check for blank line issues:
+
+
+
+# claude-opus-4.6_2026-02-12_0750_10
+
+Zero runs of excessive blank lines. Let me also check a representative section around consecutive turns to confirm it reads well:
+
+# claude-opus-4.6_2026-02-12_0750_55
+
+I notice there are still two consecutive Claude headings at lines 834-836. Let me investigate:
+
