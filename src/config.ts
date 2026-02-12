@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: CloggerConfig = {
     includeTimestamps: true,
     includeToolCalls: false,
     includeThinking: false,
-    italicizeUserMessages: true,
+    italicizeUserMessages: false,
     truncateToolResults: 1000,
   },
   recording: {

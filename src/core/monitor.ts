@@ -163,6 +163,23 @@ export class SessionMonitor {
     }
   }
 
+  /** Export the full session from the beginning to a file (overwrite mode) */
+  private async exportFullSession(
+    provider: Provider,
+    filePath: string,
+    outputFile: string,
+  ): Promise<void> {
+    const allMessages: Message[] = [];
+    for await (const { message } of provider.parseMessages(filePath, 0)) {
+      allMessages.push(message);
+    }
+
+    await exportToMarkdown(allMessages, outputFile, {
+      metadata: this.config.metadata,
+      mode: "overwrite",
+    });
+  }
+
   /** Handle an in-chat command */
   private async handleCommand(
     name: string,
@@ -172,25 +189,26 @@ export class SessionMonitor {
     filePath: string,
   ): Promise<void> {
     switch (name) {
-      case "record": {
+      case "record":
+      case "capture": {
         const outputFile = this.resolveOutputPath(args, provider, filePath);
-        logger.info("Starting recording", { sessionId, outputFile });
+        logger.info("Starting recording", { sessionId, outputFile, command: name });
 
-        // Export full session retroactively
-        const allMessages: Message[] = [];
-        for await (const { message } of provider.parseMessages(filePath, 0)) {
-          allMessages.push(message);
-        }
-
-        await exportToMarkdown(allMessages, outputFile, {
-          metadata: this.config.metadata,
-        });
+        await this.exportFullSession(provider, filePath, outputFile);
 
         this.state.setRecording(sessionId, {
           outputFile,
           started: new Date().toISOString(),
           lastExported: new Date().toISOString(),
         });
+        break;
+      }
+
+      case "export": {
+        const outputFile = this.resolveOutputPath(args, provider, filePath);
+        logger.info("Exporting session", { sessionId, outputFile });
+
+        await this.exportFullSession(provider, filePath, outputFile);
         break;
       }
 

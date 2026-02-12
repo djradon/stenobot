@@ -362,7 +362,7 @@ Location: `~/.clogger/config.json`
   "providers": {
     "claude-code": {
       "enabled": true,
-      "sessionPath": "~/.claude/projects/"
+      "sessionPaths": ["~/.claude/projects/", "~/.claude-personal/projects/"]
     },
     "chatgpt": {
       "enabled": false,
@@ -420,13 +420,21 @@ Location: `~/.clogger/config.json`
 
 **Deliverable**: CLI tool that can export existing Claude Code session JSONL to markdown
 
-### Phase 2: Real-time Monitoring
-- [ ] Wire up Session Monitor with chokidar file watching
-- [ ] Test In-Chat Command Detector (`::record`, `::stop`) in live sessions
-- [ ] Test State Manager persistence and crash recovery (~/.clogger/state.json)
-- [ ] Test `clogger start/stop` daemon lifecycle
-- [ ] Test `clogger status` with active recordings
-- [ ] Incremental export (append new messages to existing files)
+### Phase 2: Real-time Monitoring ✅
+- [x] Session Monitor with chokidar file watching, processSession pipeline
+- [x] In-Chat Command handling: `::record`, `::export`, `::capture`, `::stop`
+- [x] `::record`/`::capture` = full session overwrite + set recording state
+- [x] `::export` = one-shot full session dump (no recording state)
+- [x] `::stop` = remove recording state
+- [x] Export modes: `overwrite` (full-session commands) vs `create-or-append` (incremental)
+- [x] `exportFullSession()` helper for full-session re-export from offset 0
+- [x] State Manager with atomic writes, dirty flag, session/recording CRUD
+- [x] PID file management in `start.impl.ts` (write on start, clean on shutdown)
+- [x] Incremental export: append only new messages to active recording files
+- [x] Output path resolution: absolute, relative, @-mention prefix, tilde expansion
+- [x] Text cleaning: strip ANSI escape codes, system/IDE tags, collapse whitespace
+- [x] H1 (`#`) turn headings (avoids clash with Claude's `##` content headings)
+- [x] 50 tests: parser (11), exporter (14), detector (10), state (6), monitor (6), e2e-export (2), e2e-daemon (1)
 
 **Deliverable**: Background daemon that monitors Claude Code sessions and auto-exports based on in-chat commands
 
@@ -514,9 +522,10 @@ Location: `~/.clogger/config.json`
 6. ✅ **Recording scope**: Capture entire session from start (retroactive)
 7. ✅ **Multiple targets**: Replace previous target if new `::record` command issued
 8. ✅ **Path handling**: Support full paths (from @-mentions) and relative paths (from workspace root)
-9. ✅ **Message format**: Each message gets H2 heading with timestamp (`## Speaker_YYYY-MM-DD_HHMM_SS`)
+9. ✅ **Message format**: Each message gets H1 heading with timestamp (`# Speaker_YYYY-MM-DD_HHMM_SS`)
 10. ✅ **User message styling**: Italicized for visual distinction
 11. ✅ **Metadata defaults**: Timestamps ON, tool calls/thinking blocks OFF (but configurable)
+12. ✅ **Export vs Record vs Capture**: `::export` = one-shot dump, `::record`/`::capture` = dump + continuous recording
 
 ### CLI Commands (Daemon Control)
 
@@ -531,14 +540,15 @@ Location: `~/.clogger/config.json`
 
 ### In-Chat Commands (Recording Control)
 
-| Command                  | Description                                         | Example                              |
-| ------------------------ | --------------------------------------------------- | ------------------------------------ |
-| `::record <filename>`    | Start recording to file (full session, retroactive) | `::record @private-notes/my-conv.md` |
-| `::stop`                 | Stop current recording                              | `::stop`                             |
-| `::pause`                | Pause recording (optional feature)                  | `::pause`                            |
-| `::resume`               | Resume paused recording (optional)                  | `::resume`                           |
-| `::status`               | Show recording status (optional)                    | `::status`                           |
-| `::summarize <filename>` | Generate AI summary (future)                        | `::summarize summary.md`             |
+| Command                  | Description                                              | Example                              |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------ |
+| `::record <filename>`    | Export full session + start continuous recording          | `::record @private-notes/my-conv.md` |
+| `::capture <filename>`   | Same as `::record` (alias)                               | `::capture conv.design.md`           |
+| `::export <filename>`    | One-shot full session export (no continuous recording)    | `::export session-dump.md`           |
+| `::stop`                 | Stop current recording                                   | `::stop`                             |
+| `::pause`                | Pause recording (planned)                                | `::pause`                            |
+| `::resume`               | Resume paused recording (planned)                        | `::resume`                           |
+| `::status`               | Show recording status (planned)                          | `::status`                           |
 
 ## Open Questions
 
