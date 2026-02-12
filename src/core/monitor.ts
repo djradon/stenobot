@@ -66,13 +66,19 @@ export class SessionMonitor {
 
   /** Discover sessions from all enabled providers and set up watchers */
   private async discoverAndWatch(): Promise<void> {
-    const enabledProviders = this.getEnabledProviders();
+    const now = Date.now();
+    const maxAge = this.config.monitoring.maxSessionAge;
+    const activeFilePaths = new Set<string>();
 
-    for (const provider of enabledProviders) {
+    for (const provider of this.getEnabledProviders()) {
       try {
         for await (const session of provider.discoverSessions()) {
-          if (!this.watchers.has(session.filePath)) {
-            this.watchSession(provider, session.filePath, session.id);
+          const age = now - session.lastModified.getTime();
+          if (age <= maxAge) {
+            activeFilePaths.add(session.filePath);
+            if (!this.watchers.has(session.filePath)) {
+              this.watchSession(provider, session.filePath, session.id);
+            }
           }
         }
       } catch (error) {
@@ -80,6 +86,19 @@ export class SessionMonitor {
           provider: provider.name,
           error,
         });
+      }
+    }
+
+    this.pruneStaleWatchers(activeFilePaths);
+  }
+
+  /** Remove watchers for sessions that are no longer recently active */
+  private pruneStaleWatchers(activeFilePaths: Set<string>): void {
+    for (const [filePath, watcher] of this.watchers) {
+      if (!activeFilePaths.has(filePath)) {
+        logger.debug("Removing stale watcher", { filePath });
+        void watcher.close();
+        this.watchers.delete(filePath);
       }
     }
   }

@@ -5,6 +5,13 @@ import path from "node:path";
 import { parseClaudeMessages } from "../src/providers/claude-code/parser.js";
 import { exportToMarkdown } from "../src/core/exporter.js";
 import type { Message } from "../src/types/index.js";
+import { formatInTimeZone } from "date-fns-tz";
+
+/** Format an ISO timestamp into the heading timestamp part using local timezone */
+function localHeading(iso: string): string {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return formatInTimeZone(new Date(iso), tz, "yyyy-MM-dd_HHmm_ss");
+}
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "claude-session.jsonl");
 
@@ -43,13 +50,13 @@ describe("end-to-end export", () => {
       expect(content).toMatch(/id: \w+/);
 
       // User message — italicized with custom name
-      expect(content).toContain("# Dave_2026-02-10_2336_18");
+      expect(content).toContain(`# Dave_${localHeading("2026-02-10T23:36:18.000Z")}`);
       expect(content).toContain(
         "*I want to add authentication to my app. Can you help?*",
       );
 
       // Assistant message — uses model name
-      expect(content).toContain("# claude-opus-4.6_2026-02-10_2336_25");
+      expect(content).toContain(`# claude-opus-4.6_${localHeading("2026-02-10T23:36:25.000Z")}`);
 
       // Thinking block in details
       expect(content).toContain("<summary>Thinking</summary>");
@@ -65,7 +72,7 @@ describe("end-to-end export", () => {
       expect(content).toContain("No matches found.");
 
       // Second exchange
-      expect(content).toContain("# Dave_2026-02-10_2340_12");
+      expect(content).toContain(`# Dave_${localHeading("2026-02-10T23:40:12.000Z")}`);
       expect(content).toContain(
         "*Sounds good, let's go with Passport.js. Can you set it up?*",
       );
@@ -124,7 +131,7 @@ updated: 1770799535662
       expect(delimiterCount).toBe(2);
 
       // Messages appended
-      expect(content).toContain("# User_2026-02-10_2336_18");
+      expect(content).toContain(`# User_${localHeading("2026-02-10T23:36:18.000Z")}`);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

@@ -1,7 +1,7 @@
 import type { LocalContext } from "../context.js";
 import fs from "node:fs/promises";
-import { getCloggerDir } from "../../utils/paths.js";
-import path from "node:path";
+import { expandHome } from "../../utils/paths.js";
+import { loadConfig } from "../../config.js";
 
 interface StopFlags {}
 
@@ -9,7 +9,8 @@ export async function stopImpl(
   this: LocalContext,
   _flags: StopFlags,
 ): Promise<void> {
-  const pidFile = path.join(getCloggerDir(), "daemon.pid");
+  const config = await loadConfig();
+  const pidFile = expandHome(config.daemon.pidFile);
 
   let pid: number;
   try {

@@ -29,8 +29,9 @@ const DEFAULT_CONFIG: CloggerConfig = {
     multipleTargets: "replace",
   },
   monitoring: {
-    pollInterval: 5000,
+    pollInterval: 60000,
     stateUpdateInterval: 10000,
+    maxSessionAge: 600000,
   },
   daemon: {
     pidFile: "~/.clogger/daemon.pid",

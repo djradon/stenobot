@@ -49,7 +49,8 @@ function formatMessageHeading(
   } else {
     speaker = speakerNames?.assistant ?? "Claude";
   }
-  const formatted = formatInTimeZone(date, "UTC", "yyyy-MM-dd_HHmm_ss");
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const formatted = formatInTimeZone(date, tz, "yyyy-MM-dd_HHmm_ss");
   return `# ${speaker}_${formatted}`;
 }
 

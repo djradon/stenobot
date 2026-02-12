@@ -112,6 +112,7 @@ export interface CloggerConfig {
   monitoring: {
     pollInterval: number;
     stateUpdateInterval: number;
+    maxSessionAge: number;
   };
   daemon: {
     pidFile: string;
