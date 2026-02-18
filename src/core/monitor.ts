@@ -229,7 +229,7 @@ export class SessionMonitor {
   ): Promise<void> {
     switch (name) {
       case "capture": {
-        const outputFile = this.resolveOutputPath(args, provider, filePath);
+        const outputFile = await this.resolveOutputPath(args, provider, filePath);
         logger.info("Capturing session", { sessionId, outputFile });
 
         await this.exportFullSession(provider, filePath, outputFile);
@@ -243,7 +243,7 @@ export class SessionMonitor {
       }
 
       case "record": {
-        const outputFile = this.resolveOutputPath(args, provider, filePath);
+        const outputFile = await this.resolveOutputPath(args, provider, filePath);
         logger.info("Starting recording", { sessionId, outputFile });
 
         this.state.setRecording(sessionId, {
@@ -255,7 +255,7 @@ export class SessionMonitor {
       }
 
       case "export": {
-        const outputFile = this.resolveOutputPath(args, provider, filePath);
+        const outputFile = await this.resolveOutputPath(args, provider, filePath);
         logger.info("Exporting session", { sessionId, outputFile });
 
         await this.exportFullSession(provider, filePath, outputFile);
@@ -274,11 +274,11 @@ export class SessionMonitor {
   }
 
   /** Resolve a recording target path from command args */
-  private resolveOutputPath(
+  private async resolveOutputPath(
     rawPath: string,
     provider: Provider,
     sessionFilePath: string,
-  ): string {
+  ): Promise<string> {
     let resolved = rawPath.trim();
 
     // Strip @ prefix if present (VSCode @-mention)
@@ -289,9 +289,13 @@ export class SessionMonitor {
     resolved = expandHome(resolved);
     resolved = ensureMarkdownExtension(resolved);
 
-    // If relative, resolve against current working directory
+    // If relative, try to resolve against workspace root, fall back to cwd
     if (!path.isAbsolute(resolved)) {
-      resolved = path.resolve(process.cwd(), resolved);
+      const workspaceRoot = provider.resolveWorkspaceRoot
+        ? await provider.resolveWorkspaceRoot(sessionFilePath)
+        : undefined;
+      const base = workspaceRoot ?? process.cwd();
+      resolved = path.resolve(base, resolved);
     }
 
     return resolved;
