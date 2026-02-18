@@ -18,16 +18,4 @@ export class ClaudeCodeProvider implements Provider {
   ): AsyncIterable<{ message: Message; offset: number }> {
     return parseClaudeMessages(sessionFilePath, fromOffset);
   }
-
-  resolveWorkspaceRoot(sessionFilePath: string): string | undefined {
-    // The workspace root is encoded in the parent directory name
-    // e.g., ~/.claude/projects/-home-user-myproject/session.jsonl
-    const parts = sessionFilePath.split("/");
-    const projectDirIndex = parts.indexOf("projects");
-    if (projectDirIndex >= 0 && projectDirIndex + 1 < parts.length) {
-      const encoded = parts[projectDirIndex + 1]!;
-      return encoded.replace(/-/g, "/");
-    }
-    return undefined;
-  }
 }

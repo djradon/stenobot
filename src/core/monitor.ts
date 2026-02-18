@@ -289,11 +289,9 @@ export class SessionMonitor {
     resolved = expandHome(resolved);
     resolved = ensureMarkdownExtension(resolved);
 
-    // If relative, resolve against workspace root or output directory
+    // If relative, resolve against current working directory
     if (!path.isAbsolute(resolved)) {
-      const workspaceRoot = provider.resolveWorkspaceRoot?.(sessionFilePath);
-      const base = workspaceRoot ?? expandHome(this.config.outputDirectory);
-      resolved = path.resolve(base, resolved);
+      resolved = path.resolve(process.cwd(), resolved);
     }
 
     return resolved;

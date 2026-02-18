@@ -507,3 +507,61 @@ Perfect! Now showing:
 - `claude: -home-djradon-hub-djradon-clogger/"We will ::record this..." (af0f39da)`
 - `claude: -home-djradon-hub-semantic-flow-sflo/"I want to move a conversation..." (d00f3c06)`
 
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_1433_12
+
+Perfect! ✅ All updates complete and committed.
+
+## Final Format
+
+```
+Recordings:
+  ● claude: -home-djradon-hub-djradon-clogger/"Let's get busy -- set up all..." (c4832d16)
+    → /home/djradon/hub/djradon/clogger/documentation/notes/conv.2026.2026-02-11-lets-get-busy.md
+    Started 6 days ago · Last export 3 days ago
+
+Tracked Sessions:
+  ○ claude: -home-djradon-hub-semantic-flow-sflo/"I want to move a conversation..." (d00f3c06)
+    Last activity 3 days ago · Offset 686576
+```
+
+Each session now shows:
+- **Provider**: `claude:`
+- **Folder name**: `-home-djradon-hub-djradon-clogger/` (project context)
+- **First message**: `"Let's get busy -- set up all..."` (quick identification)
+- **Short GUID**: `(c4832d16)` (for export commands & filesystem comparison)
+- **Offset**: `Offset 686576` (for tracked sessions, debugging)
+
+All 55 tests passing! 🎉
+
+# User_2026-02-17_1727_50
+
+What's next? Do we need to implement and document "clean"?
+
+Also, help me troubleshoot: 
+
+/home/djradon/hub/semantic/flow/sflo/sflo/documentation/conv.2026.2026-02-12-tough-place.md
+
+It's still trying to reconstruct the destination file from the folder name. It should just use what's specified. We need to remove all the code that calculates a path from the dash-separated-folder-names, there's no use for that.
+
+# claude-sonnet-4-5.20250929_2026-02-17_1727_58
+
+Good catch! Let me investigate the path reconstruction bug first, then we'll update documentation.
+
+Found it! The `resolveWorkspaceRoot` method at line 29 does `encoded.replace(/-/g, "/")` which incorrectly converts `-home-djradon-hub-semantic-flow-sflo` to `/home/djradon/hub/semantic/flow/sflo/` - treating all hyphens as path separators!
+
+Let me remove this path reconstruction completely:
+
+
+
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_1729_02
+
+Great! All tests passing. Now let me update the documentation:
+
+
+
+
