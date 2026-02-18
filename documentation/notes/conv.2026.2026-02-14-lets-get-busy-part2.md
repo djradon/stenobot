@@ -1146,3 +1146,164 @@ Perfect! All tests pass. Let me add tests for the new functionality:
 
 Perfect! Let me commit these fixes:
 
+
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2227_35
+
+Excellent debugging! I've fixed both issues:
+
+## Issue 1: Multiple Commands Per Message ✓
+
+**Problem**: When you wrote `::stop and then ::capture @file.md`, only `::stop` was processed.
+
+**Fix**: Created `detectAllCommands()` that finds ALL commands in a message. The monitor now processes them in order. So this works now:
+```
+::stop
+
+::capture @sflo/documentation/file.md
+```
+
+Both commands are executed sequentially.
+
+## Issue 2: Duplicate Path Segment ✓
+
+**Problem**: Path was `/home/djradon/hub/semantic-flow/sflo/sflo/documentation/...` (redundant `sflo`)
+
+**Root cause**: 
+- Workspace root: `/home/djradon/hub/semantic-flow/sflo`
+- Visible path from `@sflo/documentation/...`: `sflo/documentation/...`
+- Resolution: `path.resolve(workspace, visible)` created the duplicate
+
+**Fix**: Added smart deduplication in [monitor.ts:292-301](src/core/monitor.ts#L292-L301):
+```typescript
+if (workspaceRoot) {
+  const workspaceBaseName = path.basename(workspaceRoot); // "sflo"
+  if (resolved.startsWith(`${workspaceBaseName}/`)) {
+    // Strip redundant prefix: "sflo/documentation/..." → "documentation/..."
+    resolved = resolved.slice(workspaceBaseName.length + 1);
+  }
+}
+```
+
+Now `@sflo/documentation/conv.md` correctly resolves to:
+`/home/djradon/hub/semantic-flow/sflo/documentation/conv.md` ✓
+
+**All 63 tests passing** (3 new tests for multiple command detection)
+
+# User_2026-02-17_2230_13
+
+I tried another message with both a stop and a capture, and the capture didn't start.
+
+# claude-sonnet-4-5.20250929_2026-02-17_2230_26
+
+Let me check the daemon output to see what happened:
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2230_37
+
+I see two issues:
+
+1. **The daemon is still running the old code** - it started at 06:04:20 and the fixes I just committed haven't taken effect yet. Notice line 18-19 still show the duplicate `sflo/sflo` path. You need to restart the daemon.
+
+2. **There might be a state persistence issue** when processing multiple commands. Let me check the `handleCommand` implementation:
+
+
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2230_55
+
+I found the issue! State changes during command processing are only saved to disk:
+1. **Periodically** via a timer (every `stateUpdateInterval`)
+2. **When the monitor stops**
+
+But **not immediately** after processing commands. Let me check if there's another issue. Let me see the full flow:
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2231_16
+
+I see the issue! Let me trace through what happens:
+
+**When `::stop` and `::capture` are in the same message:**
+1. Line 155-166: Commands are processed
+   - `::stop` → removes recording from in-memory state
+   - `::capture` → does full export, sets recording in in-memory state
+2. Line 159: `skipIncrementalExport = true` (because `::capture` was detected)
+3. Line 184-185: Check for incremental export
+   - Recording exists (just set by `::capture`)
+   - But `!skipIncrementalExport` is `false`, so no incremental export
+
+This is correct for the current batch. But here's the critical issue:
+
+**The daemon is still running old code!** You need to restart it to get the fixes:
+
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2231_30
+
+Perfect! The daemon has restarted with the new code (06:31:20). Now let me check the current status:
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2231_42
+
+Good! The daemon is now running with the new code. I can see the sflo session (d00f3c06) is tracked but **not recording**. 
+
+Now that the daemon has the fixes:
+1. ✅ Multiple commands per message will work
+2. ✅ Path duplication (`sflo/sflo`) is fixed
+
+Try your `::capture` command again and it should:
+- Process both `::stop` and `::capture` if in the same message
+- Create the correct path without the duplicate `sflo` segment
+
+The correct path will now be:
+`/home/djradon/hub/semantic-flow/sflo/documentation/conv.2026.2026-02-12-tough-place.md`
+
+instead of the previous:
+`/home/djradon/hub/semantic-flow/sflo/sflo/documentation/conv.2026.2026-02-12-tough-place.md` ✓
+
+# claude-sonnet-4-5.20250929_2026-02-17_2231_46
+
+Let me check the new daemon logs to see what's happening:
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2231_52
+
+Let me check the most recent messages in the sflo session to see what command you sent:
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2232_01
+
+I can see the issue! The message with both commands (`::stop` and `::capture`) was sent at **06:29:12**, but the daemon with the new code didn't start until **06:31:20**. So the old daemon (with the old code) processed that message.
+
+Let me check if there have been any new messages since the daemon restarted:
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2232_43
+
+Excellent! Let me check the daemon logs to confirm:
+
+
+
+# claude-sonnet-4-5.20250929_2026-02-17_2232_57
+
+Perfect! ✅ Looking at line 16, the capture worked and the path is now correct:
+
+**Before (broken):**
+`/home/djradon/hub/semantic-flow/sflo/sflo/documentation/conv.2026.2026-02-12-tough-place.md` ❌
+
+**Now (fixed):**
+`/home/djradon/hub/semantic-flow/sflo/documentation/conv.2026.2026-02-12-tough-place.md` ✓
+
+Both fixes are working:
+1. ✅ **Multiple commands processed** - The daemon will now handle `::stop` and `::capture` in the same message
+2. ✅ **No path duplication** - The redundant workspace basename is stripped before resolution
+
+The session is now being captured to the correct location!
