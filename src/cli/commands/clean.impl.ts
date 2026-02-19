@@ -1,6 +1,5 @@
 import type { LocalContext } from "../context.js";
 import { StateManager } from "../../core/state.js";
-import { loadConfig } from "../../config.js";
 import chalk from "chalk";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -72,7 +71,7 @@ async function formatSessionLabel(filePath: string): Promise<string> {
   const metadata = await getSessionMetadata(filePath);
 
   // Extract encoded folder name from path
-  const parts = filePath.split("/");
+  const parts = path.normalize(filePath).split(path.sep);
   const projectsIdx = parts.indexOf("projects");
   const folderName = (projectsIdx >= 0 && projectsIdx + 1 < parts.length)
     ? parts[projectsIdx + 1]!
@@ -105,7 +104,6 @@ export async function cleanImpl(
     return;
   }
 
-  const config = await loadConfig();
   const state = new StateManager();
   await state.load();
 

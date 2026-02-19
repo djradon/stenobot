@@ -17,7 +17,7 @@ const execAsync = promisify(exec);
 export async function resolveWorkspaceRoot(sessionFilePath: string): Promise<string | undefined> {
   // Extract encoded folder name from session path
   // e.g., ~/.claude-personal/projects/-home-djradon-hub-semantic-flow-sflo/session.jsonl
-  const parts = sessionFilePath.split("/");
+  const parts = path.normalize(sessionFilePath).split(path.sep);
   const projectsIdx = parts.indexOf("projects");
 
   if (projectsIdx < 0 || projectsIdx + 1 >= parts.length) {
@@ -100,20 +100,17 @@ async function findInDirectory(
 
       const fullPath = path.join(parentDir, entry.name);
 
-      // Check if this directory or any subdirectory matches
+      // Check if this directory matches the target name
       if (entry.name === targetName) {
         results.push(fullPath);
       }
 
-      // Also check if the target exists as a subdirectory
-      const subPath = path.join(fullPath, targetName);
-      try {
-        const stat = await fs.stat(subPath);
-        if (stat.isDirectory()) {
-          results.push(subPath);
+      // Recurse into subdirectories if depth allows
+      if (maxDepth > 1) {
+        const subResults = await findInDirectory(fullPath, targetName, maxDepth - 1);
+        for (const r of subResults) {
+          if (!results.includes(r)) results.push(r);
         }
-      } catch {
-        // Doesn't exist, skip
       }
     }
 

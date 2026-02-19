@@ -4,9 +4,10 @@ import { loadConfig } from "../../config.js";
 import { expandHome } from "../../utils/paths.js";
 import { formatDistanceToNow } from "date-fns";
 import chalk from "chalk";
-import fs from "node:fs/promises";
+import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
+import readline from "node:readline";
 
 interface StatusFlags {}
 
@@ -14,8 +15,11 @@ interface StatusFlags {}
 async function isDaemonRunning(pidFile: string): Promise<{ running: boolean; pid?: number }> {
   let pid: number;
   try {
-    const raw = await fs.readFile(pidFile, "utf-8");
+    const raw = await fsPromises.readFile(pidFile, "utf-8");
     pid = parseInt(raw.trim(), 10);
+    if (!Number.isFinite(pid)) {
+      return { running: false };
+    }
   } catch {
     return { running: false };
   }
@@ -24,7 +28,11 @@ async function isDaemonRunning(pidFile: string): Promise<{ running: boolean; pid
     // Signal 0 tests if the process exists without actually sending a signal
     process.kill(pid, 0);
     return { running: true, pid };
-  } catch {
+  } catch (err) {
+    // EPERM means the process exists but we don't have permission to signal it
+    if ((err as NodeJS.ErrnoException).code === "EPERM") {
+      return { running: true, pid };
+    }
     return { running: false, pid };
   }
 }
@@ -34,37 +42,54 @@ interface SessionMetadata {
   firstUserMessage: string | null;
 }
 
-/** Extract session metadata from JSONL file */
+/** Extract session metadata from JSONL file by streaming only the first N lines */
 async function getSessionMetadata(jsonlPath: string): Promise<SessionMetadata | null> {
-  try {
-    const content = await fs.readFile(jsonlPath, "utf-8");
-    const lines = content.split("\n").slice(0, 20);
-
+  return new Promise((resolve) => {
     let sessionId = "";
     let firstUserMessage: string | null = null;
+    let linesRead = 0;
+    let settled = false;
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
+    const done = (result: SessionMetadata | null) => {
+      if (settled) return;
+      settled = true;
+      rl.close();
+      stream.destroy();
+      resolve(result);
+    };
+
+    let stream: fs.ReadStream;
+    try {
+      stream = fs.createReadStream(jsonlPath, { encoding: "utf-8" });
+    } catch {
+      resolve(null);
+      return;
+    }
+
+    stream.on("error", () => done(null));
+
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+    rl.on("line", (line) => {
+      if (settled) return;
+      if (!line.trim()) return;
+      if (++linesRead > 20) { done(sessionId ? { sessionId, firstUserMessage } : null); return; }
+
       try {
         const parsed = JSON.parse(line);
 
-        // Get session ID from any line
         if (!sessionId && parsed.sessionId) {
           sessionId = parsed.sessionId;
         }
 
-        // Get first user message text (skip system tags)
         if (!firstUserMessage && parsed.type === "user" && parsed.message?.content) {
           for (const block of parsed.message.content) {
             if (block.type === "text" && block.text) {
-              // Skip system reminders and tags
               const cleaned = block.text
                 .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
                 .replace(/<ide_[^>]+>[\s\S]*?<\/ide_[^>]+>/g, "")
                 .trim();
-
               if (cleaned) {
-                // Take first ~60 chars, strip newlines
                 firstUserMessage = cleaned.replace(/\n/g, " ").slice(0, 60);
                 break;
               }
@@ -72,16 +97,16 @@ async function getSessionMetadata(jsonlPath: string): Promise<SessionMetadata | 
           }
         }
 
-        if (sessionId && firstUserMessage) break;
+        if (sessionId && firstUserMessage) {
+          done({ sessionId, firstUserMessage });
+        }
       } catch {
-        continue;
+        // skip unparseable line
       }
-    }
+    });
 
-    return sessionId ? { sessionId, firstUserMessage } : null;
-  } catch {
-    return null;
-  }
+    rl.on("close", () => done(sessionId ? { sessionId, firstUserMessage } : null));
+  });
 }
 
 /** Format a session label as "claude: folder-name/"first message..." (session-id-short)" */
@@ -89,7 +114,7 @@ async function formatSessionLabel(filePath: string): Promise<string> {
   const metadata = await getSessionMetadata(filePath);
 
   // Extract encoded folder name from path
-  const parts = filePath.split("/");
+  const parts = path.normalize(filePath).split(path.sep);
   const projectsIdx = parts.indexOf("projects");
   const folderName = (projectsIdx >= 0 && projectsIdx + 1 < parts.length)
     ? parts[projectsIdx + 1]!

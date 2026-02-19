@@ -425,7 +425,7 @@ Location: `~/.clogger/config.json`
 - [x] Session Monitor with chokidar file watching, processSession pipeline
 - [x] In-Chat Command handling: `::record`, `::export`, `::capture`, `::stop`
 - [x] `::capture` = export full pre-existing session + start continuous recording of future turns
-- [x] `::record` = same behavior as `::capture` (synonym)
+- [x] `::record` = forward-only recording (no retroactive export); only records messages after the command
 - [x] `::export` = one-shot full session dump (no continuous recording)
 - [x] `::stop` = remove recording state
 - [x] Export modes: `overwrite` (full-session commands) vs `create-or-append` (incremental)

@@ -273,7 +273,7 @@ Want me to commit these changes?
 
 For cleanup, Option A is fine for recordings. For sessions, why isn't the current session showing up? 
 
-I thought we decided to eliminate path-based session display as it was impossible to reconstruct the path from the hypenated session name? Tracked sessions (i.e., tracked chats) should start with the LLM/plugin name, e.g. "claude:" and then the "project folder name", e.g. -home-djradon-hub-semantic-flow-sflo, and should ideally use the human-friendly conversation title (rather than the GUID ID) if that's easy to extract from the conversation. Probably session tracking should be cleared out on every service restart, since all conversations are monitored anyhow... Does a tracked session just mean the folder is watched more carefully?
+I thought we decided to eliminate path-based session display as it was impossible to reconstruct the path from the hyphenated session name? Tracked sessions (i.e., tracked chats) should start with the LLM/plugin name, e.g. "claude:" and then the "project folder name", e.g. -home-djradon-hub-semantic-flow-sflo, and should ideally use the human-friendly conversation title (rather than the GUID ID) if that's easy to extract from the conversation. Probably session tracking should be cleared out on every service restart, since all conversations are monitored anyhow... Does a tracked session just mean the folder is watched more carefully?
 
 # claude-sonnet-4-5.20250929_2026-02-17_1340_20
 

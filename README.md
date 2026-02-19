@@ -39,6 +39,7 @@ That's it. The daemon watches `~/.claude/projects/` and `~/.claude-personal/proj
 | `clogger stop` | Stop the daemon |
 | `clogger status` | Show active sessions and recordings |
 | `clogger export <session-id>` | One-shot export of a session to markdown |
+| `clogger clean` | Clean recordings and/or sessions |
 
 ### Export flags
 
@@ -48,6 +49,15 @@ clogger export <session-id> --thinking    # include thinking blocks
 clogger export <session-id> --toolCalls   # include tool call details
 ```
 
+### Clean flags
+
+```bash
+clogger clean --recordings <days>   # remove recordings older than N days
+clogger clean --sessions <days>     # remove tracked sessions older than N days
+clogger clean --all                 # remove all recordings and sessions
+clogger clean --dryRun              # preview what would be removed without making changes
+```
+
 ## In-Chat Commands
 
 Type these directly in a Claude Code conversation while the daemon is running:
@@ -55,7 +65,7 @@ Type these directly in a Claude Code conversation while the daemon is running:
 | Command | Description |
 |---------|-------------|
 | `::capture <file>` | Export full pre-existing session + record future turns |
-| `::record <file>` | Synonym for `::capture` |
+| `::record <file>` | Forward-only recording (no retroactive export) |
 | `::export <file>` | One-shot full session export (no continuous recording) |
 | `::stop` | Stop the current recording |
 
@@ -65,7 +75,7 @@ File paths can be absolute, relative to workspace root, or use `@` prefix (VSCod
 
 > I'm going to ::capture this conversation to @documentation/notes/conv.design-review.md
 
-The daemon picks up the `::record` regardless of surrounding text.
+The daemon picks up the `::capture` (or `::record`) regardless of surrounding text.
 
 If the target file already has YAML frontmatter (e.g., a Dendron note), clogger preserves it and only writes the conversation content below.
 

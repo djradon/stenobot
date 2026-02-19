@@ -301,9 +301,11 @@ export class SessionMonitor {
       // This happens when users type "@sflo/..." in VSCode
       if (workspaceRoot) {
         const workspaceBaseName = path.basename(workspaceRoot);
-        if (resolved.startsWith(`${workspaceBaseName}/`)) {
+        const prefix = workspaceBaseName + path.sep;
+        const normalizedResolved = path.normalize(resolved);
+        if (normalizedResolved.startsWith(prefix)) {
           // Strip the redundant prefix
-          resolved = resolved.slice(workspaceBaseName.length + 1);
+          resolved = normalizedResolved.slice(prefix.length);
         }
       }
 

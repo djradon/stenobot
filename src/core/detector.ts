@@ -39,7 +39,7 @@ function extractPath(rawArgs: string, fullMessage: string): string {
       const fullPath = match[1]!.trim();
       // Check if this IDE file matches our visible path
       // The visible path should be a suffix of the full path
-      if (fullPath.endsWith('.md') && fullPath.endsWith(visiblePath)) {
+      if (fullPath.endsWith(visiblePath)) {
         return fullPath;
       }
     }
