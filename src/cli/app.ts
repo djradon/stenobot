@@ -5,6 +5,7 @@ import { statusCommand } from "./commands/status.js";
 import { exportCommand } from "./commands/export.js";
 import { cleanCommand } from "./commands/clean.js";
 import { initCommand } from "./commands/init.js";
+import pkg from "../../package.json" with { type: "json" };
 
 const routes = buildRouteMap({
   routes: {
@@ -23,6 +24,6 @@ const routes = buildRouteMap({
 export const app = buildApplication(routes, {
   name: "stenobot",
   versionInfo: {
-    currentVersion: "0.1.0",
+    currentVersion: pkg.version,
   },
 });

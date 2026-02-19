@@ -1,6 +1,6 @@
 {
   "name": "stenobot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Chat logger — monitor and export LLM conversation logs to markdown",
   "type": "module",
   "bin": {
