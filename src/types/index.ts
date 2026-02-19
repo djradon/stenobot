@@ -102,10 +102,6 @@ export interface CloggerConfig {
     italicizeUserMessages: boolean;
     truncateToolResults: number;
   };
-  recording: {
-    captureMode: "full-session";
-    multipleTargets: "replace";
-  };
   monitoring: {
     pollInterval: number;
     stateUpdateInterval: number;

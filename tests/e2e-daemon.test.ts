@@ -53,7 +53,6 @@ function makeConfig(tmpDir: string): CloggerConfig {
       italicizeUserMessages: true,
       truncateToolResults: 1000,
     },
-    recording: { captureMode: "full-session", multipleTargets: "replace" },
     monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
     daemon: { pidFile: "~/.clogger/daemon.pid", logFile: "~/.clogger/daemon.log" },
   };

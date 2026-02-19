@@ -6,7 +6,7 @@ import { SessionMonitor } from "../src/core/monitor.js";
 import { StateManager } from "../src/core/state.js";
 import { ProviderRegistry } from "../src/providers/registry.js";
 import type { Provider } from "../src/providers/base.js";
-import type { Message, Session, CloggerConfig } from "../src/types/index.js";
+import type { Session, CloggerConfig } from "../src/types/index.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -26,7 +26,6 @@ function makeConfig(overrides: Partial<CloggerConfig> = {}): CloggerConfig {
       italicizeUserMessages: true,
       truncateToolResults: 1000,
     },
-    recording: { captureMode: "full-session", multipleTargets: "replace" },
     monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
     daemon: { pidFile: "~/.clogger/daemon.pid", logFile: "~/.clogger/daemon.log" },
     ...overrides,

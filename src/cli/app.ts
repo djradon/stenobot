@@ -4,9 +4,11 @@ import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
 import { exportCommand } from "./commands/export.js";
 import { cleanCommand } from "./commands/clean.js";
+import { initCommand } from "./commands/init.js";
 
 const routes = buildRouteMap({
   routes: {
+    init: initCommand,
     start: startCommand,
     stop: stopCommand,
     status: statusCommand,

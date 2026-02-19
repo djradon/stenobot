@@ -2,7 +2,7 @@ import type { LocalContext } from "../context.js";
 import { ProviderRegistry } from "../../providers/registry.js";
 import { StateManager } from "../../core/state.js";
 import { SessionMonitor } from "../../core/monitor.js";
-import { loadConfig } from "../../config.js";
+import { loadConfig, generateDefaultConfig } from "../../config.js";
 import { expandHome } from "../../utils/paths.js";
 import fs from "node:fs/promises";
 import nodePath from "node:path";
@@ -14,6 +14,11 @@ export async function startImpl(
   _flags: StartFlags,
 ): Promise<void> {
   this.process.stdout.write("Starting clogger daemon...\n");
+
+  const configResult = await generateDefaultConfig();
+  if (configResult.created) {
+    this.process.stdout.write(`Config file created: ${configResult.path}\n`);
+  }
 
   const config = await loadConfig();
   const registry = new ProviderRegistry(config);
