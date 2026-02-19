@@ -4,6 +4,7 @@ import { StateManager } from "../../core/state.js";
 import { SessionMonitor } from "../../core/monitor.js";
 import { loadConfig, generateDefaultConfig } from "../../config.js";
 import { expandHome } from "../../utils/paths.js";
+import { configureLogger, logger } from "../../utils/logger.js";
 import fs from "node:fs/promises";
 import nodePath from "node:path";
 import { spawn } from "node:child_process";
@@ -85,20 +86,57 @@ export async function startImpl(
 
 async function runDaemon(ctx: LocalContext): Promise<void> {
   const config = await loadConfig();
+  const logFile = expandHome(config.daemon.logFile);
+  await configureLogger({ logFile, includeConsole: false });
+
+  logger.info("Daemon process started", {
+    pid: ctx.process.pid,
+    logFile,
+  });
+
   const registry = new ProviderRegistry(config);
   const state = new StateManager();
   const monitor = new SessionMonitor(registry, state, config);
 
-  await monitor.start();
-
   const pidFile = expandHome(config.daemon.pidFile);
+  let shuttingDown = false;
 
-  const shutdown = async () => {
-    await monitor.stop();
-    await fs.rm(pidFile, { force: true });
-    ctx.process.exit(0);
+  const shutdown = async (exitCode = 0) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    let finalExitCode = exitCode;
+
+    try {
+      await monitor.stop();
+    } catch (error) {
+      logger.error("Error stopping monitor", { error });
+      finalExitCode = 1;
+    }
+
+    try {
+      await fs.rm(pidFile, { force: true });
+    } catch (error) {
+      logger.error("Error removing daemon PID file", { pidFile, error });
+      finalExitCode = 1;
+    }
+
+    logger.info("Daemon process exiting", {
+      pid: ctx.process.pid,
+      exitCode: finalExitCode,
+    });
+    ctx.process.exit(finalExitCode);
   };
 
-  ctx.process.on("SIGINT", () => void shutdown());
-  ctx.process.on("SIGTERM", () => void shutdown());
+  ctx.process.on("SIGINT", () => void shutdown(0));
+  ctx.process.on("SIGTERM", () => void shutdown(0));
+  ctx.process.on("uncaughtException", (error) => {
+    logger.error("Unhandled daemon exception", { error });
+    void shutdown(1);
+  });
+  ctx.process.on("unhandledRejection", (reason) => {
+    logger.error("Unhandled daemon rejection", { reason });
+    void shutdown(1);
+  });
+
+  await monitor.start();
 }
