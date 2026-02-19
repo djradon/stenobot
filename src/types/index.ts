@@ -53,6 +53,7 @@ export interface AppState {
     string,
     {
       filePath: string;
+      provider?: string;
       lastProcessedOffset: number;
       lastProcessedTimestamp: string;
       recordingTarget?: string;

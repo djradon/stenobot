@@ -16,4 +16,7 @@ export interface Provider {
 
   /** Optional: resolve the workspace root directory for a session */
   resolveWorkspaceRoot?(sessionFilePath: string): Promise<string | undefined>;
+
+  /** Optional: return a short human-readable label for a session (first user message, ≤60 chars) */
+  getSessionLabel?(filePath: string): Promise<string | null>;
 }

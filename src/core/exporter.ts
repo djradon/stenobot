@@ -165,9 +165,18 @@ export function renderToString(
   }
 
   let lastRole: string | null = null;
+  let lastRenderedSignature: string | null = null;
 
   for (const message of messages) {
     if (isEmptyMessage(message, options)) continue;
+    const signature = [
+      message.id,
+      message.role,
+      message.timestamp,
+      message.model ?? "",
+      message.content,
+    ].join("\u0000");
+    if (signature === lastRenderedSignature) continue;
 
     const includeHeading = message.role !== lastRole;
     const formatted = formatMessage(message, options, { includeHeading });
@@ -175,6 +184,7 @@ export function renderToString(
     parts.push(formatted);
     parts.push("");
     lastRole = message.role;
+    lastRenderedSignature = signature;
   }
 
   return parts.join("\n");
@@ -221,10 +231,10 @@ export async function exportToMarkdown(
       const body = renderToString(messages, {
         ...options,
         includeFrontmatter: false,
-      });
+      }).trim();
       await fs.writeFile(
         outputPath,
-        existingFrontmatter + "\n\n" + body,
+        body ? `${existingFrontmatter}\n\n${body}` : `${existingFrontmatter}\n`,
         "utf-8",
       );
     } else {
@@ -249,8 +259,22 @@ export async function exportToMarkdown(
     const content = renderToString(messages, {
       ...options,
       includeFrontmatter: false,
-    });
-    await fs.appendFile(outputPath, "\n" + content, "utf-8");
+    }).trim();
+    if (!content) return;
+
+    const existing = await fs.readFile(outputPath, "utf-8");
+    if (existing.trimEnd().endsWith(content)) return;
+
+    const separator =
+      existing.length === 0
+        ? ""
+        : existing.endsWith("\n\n")
+          ? ""
+          : existing.endsWith("\n")
+            ? "\n"
+            : "\n\n";
+
+    await fs.appendFile(outputPath, separator + content, "utf-8");
   } else {
     // New file — include frontmatter
     const title = options.title ?? path.basename(outputPath, ".md");

@@ -7,7 +7,6 @@ import { exportToMarkdown } from "./exporter.js";
 import { ensureMarkdownExtension, expandHome } from "../utils/paths.js";
 import { logger } from "../utils/logger.js";
 import type { StenobotConfig, Message } from "../types/index.js";
-import fs from "node:fs/promises";
 import path from "node:path";
 
 /** Convert a string to a URL-safe slug for use in auto-generated filenames */
@@ -205,6 +204,7 @@ export class SessionMonitor {
     // Update state with latest offset
     this.state.updateSession(sessionId, {
       filePath,
+      provider: provider.name,
       lastProcessedOffset: latestOffset,
       lastProcessedTimestamp: new Date().toISOString(),
     });
@@ -356,7 +356,7 @@ export class SessionMonitor {
     provider: Provider,
   ): Promise<string> {
     const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const firstMessage = await this.getFirstUserMessage(sessionFilePath);
+    const firstMessage = await provider.getSessionLabel?.(sessionFilePath) ?? null;
     const slug = slugify(firstMessage ?? "session");
     const filename = `${date}-${slug}.md`;
 
@@ -364,31 +364,6 @@ export class SessionMonitor {
       ? await provider.resolveWorkspaceRoot(sessionFilePath)
       : undefined;
     return path.resolve(workspaceRoot ?? process.cwd(), filename);
-  }
-
-  /** Read the first non-system user message text from a session JSONL file */
-  private async getFirstUserMessage(filePath: string): Promise<string | null> {
-    try {
-      const content = await fs.readFile(filePath, "utf-8");
-      for (const line of content.split("\n").slice(0, 30)) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = JSON.parse(line);
-          if (parsed.type === "user" && parsed.message?.content) {
-            for (const block of parsed.message.content) {
-              if (block.type === "text" && block.text) {
-                const cleaned = (block.text as string)
-                  .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
-                  .replace(/<ide_[^>]+>[\s\S]*?<\/ide_[^>]+>/g, "")
-                  .trim();
-                if (cleaned) return cleaned.replace(/\n/g, " ").slice(0, 80);
-              }
-            }
-          }
-        } catch { continue; }
-      }
-    } catch { /* ignore read errors */ }
-    return null;
   }
 
   private getEnabledProviders(): Provider[] {

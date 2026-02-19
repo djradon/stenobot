@@ -1,13 +1,11 @@
 import type { LocalContext } from "../context.js";
 import { StateManager } from "../../core/state.js";
 import { loadConfig } from "../../config.js";
+import { ProviderRegistry } from "../../providers/registry.js";
 import { expandHome } from "../../utils/paths.js";
 import { formatDistanceToNow } from "date-fns";
 import chalk from "chalk";
-import fs from "node:fs";
 import fsPromises from "node:fs/promises";
-import path from "node:path";
-import readline from "node:readline";
 
 interface StatusFlags {}
 
@@ -37,98 +35,24 @@ async function isDaemonRunning(pidFile: string): Promise<{ running: boolean; pid
   }
 }
 
-interface SessionMetadata {
-  sessionId: string;
-  firstUserMessage: string | null;
-}
-
-/** Extract session metadata from JSONL file by streaming only the first N lines */
-async function getSessionMetadata(jsonlPath: string): Promise<SessionMetadata | null> {
-  return new Promise((resolve) => {
-    let sessionId = "";
-    let firstUserMessage: string | null = null;
-    let linesRead = 0;
-    let settled = false;
-
-    const done = (result: SessionMetadata | null) => {
-      if (settled) return;
-      settled = true;
-      rl.close();
-      stream.destroy();
-      resolve(result);
-    };
-
-    let stream: fs.ReadStream;
-    try {
-      stream = fs.createReadStream(jsonlPath, { encoding: "utf-8" });
-    } catch {
-      resolve(null);
-      return;
-    }
-
-    stream.on("error", () => done(null));
-
-    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-
-    rl.on("line", (line) => {
-      if (settled) return;
-      if (!line.trim()) return;
-      if (++linesRead > 20) { done(sessionId ? { sessionId, firstUserMessage } : null); return; }
-
-      try {
-        const parsed = JSON.parse(line);
-
-        if (!sessionId && parsed.sessionId) {
-          sessionId = parsed.sessionId;
-        }
-
-        if (!firstUserMessage && parsed.type === "user" && parsed.message?.content) {
-          for (const block of parsed.message.content) {
-            if (block.type === "text" && block.text) {
-              const cleaned = block.text
-                .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
-                .replace(/<ide_[^>]+>[\s\S]*?<\/ide_[^>]+>/g, "")
-                .trim();
-              if (cleaned) {
-                firstUserMessage = cleaned.replace(/\n/g, " ").slice(0, 60);
-                break;
-              }
-            }
-          }
-        }
-
-        if (sessionId && firstUserMessage) {
-          done({ sessionId, firstUserMessage });
-        }
-      } catch {
-        // skip unparseable line
+/** Format a session label using the provider's getSessionLabel, falling back to raw file path */
+async function formatSessionLabel(
+  filePath: string,
+  providerName: string | undefined,
+  registry: ProviderRegistry,
+): Promise<string> {
+  if (providerName) {
+    const provider = registry.get(providerName);
+    if (provider?.getSessionLabel) {
+      const label = await provider.getSessionLabel(filePath);
+      if (label) {
+        return `${providerName}: "${label}..."`;
       }
-    });
-
-    rl.on("close", () => done(sessionId ? { sessionId, firstUserMessage } : null));
-  });
-}
-
-/** Format a session label as "claude: folder-name/"first message..." (session-id-short)" */
-async function formatSessionLabel(filePath: string): Promise<string> {
-  const metadata = await getSessionMetadata(filePath);
-
-  // Extract encoded folder name from path
-  const parts = path.normalize(filePath).split(path.sep);
-  const projectsIdx = parts.indexOf("projects");
-  const folderName = (projectsIdx >= 0 && projectsIdx + 1 < parts.length)
-    ? parts[projectsIdx + 1]!
-    : null;
-
-  if (metadata) {
-    const shortId = metadata.sessionId.slice(0, 8);
-    const message = metadata.firstUserMessage
-      ? `"${metadata.firstUserMessage}..."`
-      : `(no message)`;
-    const folder = folderName ? `${folderName}/` : "";
-    return `claude: ${folder}${message} (${shortId})`;
+      return `${providerName}: (no message)`;
+    }
   }
 
+  // Fallback: raw file path
   return filePath;
 }
 
@@ -147,6 +71,7 @@ export async function statusImpl(
 ): Promise<void> {
   const config = await loadConfig();
   const pidFile = expandHome(config.daemon.pidFile);
+  const registry = new ProviderRegistry(config);
 
   // Daemon status
   const daemon = await isDaemonRunning(pidFile);
@@ -183,7 +108,9 @@ export async function statusImpl(
     this.process.stdout.write(chalk.bold("\nRecordings:\n"));
     for (const [id, recording] of recordingEntries) {
       const session = sessions[id];
-      const workspace = session ? await formatSessionLabel(session.filePath) : "unknown";
+      const workspace = session
+        ? await formatSessionLabel(session.filePath, session.provider, registry)
+        : "unknown";
       this.process.stdout.write(
         `  ${chalk.green("●")} ${chalk.cyan(workspace)}\n`,
       );
@@ -203,7 +130,7 @@ export async function statusImpl(
   if (nonRecordingSessions.length > 0) {
     this.process.stdout.write(chalk.bold("\nTracked Sessions:\n"));
     for (const [, session] of nonRecordingSessions) {
-      const workspace = await formatSessionLabel(session.filePath);
+      const workspace = await formatSessionLabel(session.filePath, session.provider, registry);
       this.process.stdout.write(
         `  ${chalk.dim("○")} ${chalk.cyan(workspace)}\n`,
       );

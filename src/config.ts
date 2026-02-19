@@ -15,6 +15,12 @@ const DEFAULT_CONFIG: StenobotConfig = {
         "~/.claude-personal/projects/",
       ],
     },
+    "codex": {
+      enabled: true,
+      sessionPaths: [
+        "~/.codex/sessions",
+      ],
+    },
   },
   outputDirectory: "~/stenobot-output",
   fileNamingTemplate: "conv.{provider}.{date}.{session-short}.md",
@@ -54,6 +60,11 @@ providers:
       - ${q}${slash("~/.claude-personal/projects/")}${q}
     # Optional: set a default export path for this provider
     # exportPath: ${q}${slash("~/my-exports")}${q}
+  codex:
+    enabled: true
+    # Path where OpenAI Codex (VSCode extension and CLI) stores session files
+    sessionPaths:
+      - ${q}${slash("~/.codex/sessions")}${q}
 
 # Default directory for exported markdown files
 outputDirectory: ${q}${slash("~/stenobot-output")}${q}

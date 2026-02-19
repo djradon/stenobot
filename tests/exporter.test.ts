@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { formatMessage, renderToString } from "../src/core/exporter.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { exportToMarkdown, formatMessage, renderToString } from "../src/core/exporter.js";
 import type { ExportOptions } from "../src/core/exporter.js";
 import type { Message } from "../src/types/index.js";
 import { formatInTimeZone } from "date-fns-tz";
@@ -202,5 +205,47 @@ describe("renderToString", () => {
     const userIdx = result.indexOf("# User_");
     const assistantIdx = result.indexOf("# claude-opus-4.6_");
     expect(userIdx).toBeLessThan(assistantIdx);
+  });
+});
+
+describe("exportToMarkdown", () => {
+  it("does not append the same rendered block twice", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-exporter-test-"));
+    const outputPath = path.join(tmpDir, "dedupe.md");
+
+    try {
+      const message = makeAssistantMessage();
+      await exportToMarkdown([message], outputPath, baseOptions);
+      await exportToMarkdown([message], outputPath, baseOptions);
+
+      const content = await fs.readFile(outputPath, "utf-8");
+      const heading = `# claude-opus-4.6_${localHeading(message.timestamp)}`;
+      const headingCount = content.split(heading).length - 1;
+      expect(headingCount).toBe(1);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips append when a batch has no visible content", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-exporter-test-"));
+    const outputPath = path.join(tmpDir, "no-blank-lines.md");
+
+    try {
+      await exportToMarkdown([makeUserMessage()], outputPath, baseOptions);
+      const before = await fs.readFile(outputPath, "utf-8");
+
+      const invisibleAssistant = makeAssistantMessage({
+        id: "msg-a2",
+        content: "",
+        toolCalls: [{ id: "toolu_2", name: "Read" }],
+      });
+      await exportToMarkdown([invisibleAssistant], outputPath, baseOptions);
+
+      const after = await fs.readFile(outputPath, "utf-8");
+      expect(after).toBe(before);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });
