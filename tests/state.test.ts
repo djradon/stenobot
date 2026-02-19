@@ -7,7 +7,7 @@ import { StateManager } from "../src/core/state.js";
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "clogger-state-test-"));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-state-test-"));
 });
 
 afterEach(async () => {

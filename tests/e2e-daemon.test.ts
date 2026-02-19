@@ -6,7 +6,7 @@ import { SessionMonitor } from "../src/core/monitor.js";
 import { StateManager } from "../src/core/state.js";
 import { ProviderRegistry } from "../src/providers/registry.js";
 import type { Provider } from "../src/providers/base.js";
-import type { Session, CloggerConfig } from "../src/types/index.js";
+import type { Session, StenobotConfig } from "../src/types/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,7 +41,7 @@ function assistantEntry(
   });
 }
 
-function makeConfig(tmpDir: string): CloggerConfig {
+function makeConfig(tmpDir: string): StenobotConfig {
   return {
     providers: { "test-provider": { enabled: true } },
     outputDirectory: tmpDir,
@@ -54,7 +54,7 @@ function makeConfig(tmpDir: string): CloggerConfig {
       truncateToolResults: 1000,
     },
     monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
-    daemon: { pidFile: "~/.clogger/daemon.pid", logFile: "~/.clogger/daemon.log" },
+    daemon: { pidFile: "~/.stenobot/daemon.pid", logFile: "~/.stenobot/daemon.log" },
   };
 }
 
@@ -81,7 +81,7 @@ function makeProvider(sessionFile: string, sessionId: string): Provider {
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "clogger-e2e-daemon-"));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-e2e-daemon-"));
 });
 
 afterEach(async () => {

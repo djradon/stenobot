@@ -6,10 +6,18 @@ import { loadConfig, generateDefaultConfig } from "../../config.js";
 import { expandHome } from "../../utils/paths.js";
 import { configureLogger, logger } from "../../utils/logger.js";
 import fs from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import nodePath from "node:path";
 import { spawn } from "node:child_process";
 
 interface StartFlags {}
+
+interface ChildStartupResult {
+  exited: boolean;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  error?: Error;
+}
 
 export async function startImpl(
   this: LocalContext,
@@ -30,7 +38,10 @@ export async function startImpl(
   const config = await loadConfig();
   const pidFile = expandHome(config.daemon.pidFile);
   const pidDir = nodePath.dirname(pidFile);
+  const logFile = expandHome(config.daemon.logFile);
+  const logDir = nodePath.dirname(logFile);
   await fs.mkdir(pidDir, { recursive: true });
+  await fs.mkdir(logDir, { recursive: true });
 
   // Exclusively create PID file to prevent dual-start race
   try {
@@ -66,12 +77,34 @@ export async function startImpl(
     }
   }
 
-  // Spawn detached child with STENOBOT_DAEMON_MODE=1
-  const child = spawn(this.process.execPath, this.process.argv.slice(1), {
-    detached: true,
-    stdio: "ignore",
-    env: { ...this.process.env, STENOBOT_DAEMON_MODE: "1" },
-  });
+  let logHandle: FileHandle;
+  try {
+    logHandle = await fs.open(logFile, "a");
+  } catch (error) {
+    await fs.rm(pidFile, { force: true });
+    this.process.stderr.write(
+      `Failed to open daemon log file at ${logFile}: ${String(error)}\n`,
+    );
+    return;
+  }
+
+  let child: ReturnType<typeof spawn>;
+  try {
+    const childArgv = [...this.process.execArgv, ...this.process.argv.slice(1)];
+    // Redirect daemon stdout/stderr to daemon.logFile so early startup crashes are captured.
+    child = spawn(this.process.execPath, childArgv, {
+      detached: true,
+      stdio: ["ignore", logHandle.fd, logHandle.fd],
+      env: { ...this.process.env, STENOBOT_DAEMON_MODE: "1" },
+    });
+  } catch (error) {
+    await logHandle.close();
+    await fs.rm(pidFile, { force: true });
+    this.process.stderr.write(`Failed to spawn daemon process: ${String(error)}\n`);
+    return;
+  }
+
+  await logHandle.close();
 
   if (child.pid === undefined) {
     await fs.rm(pidFile, { force: true });
@@ -79,9 +112,53 @@ export async function startImpl(
     return;
   }
 
+  const startup = await waitForChildStartup(child, 400);
+  if (startup.exited) {
+    await fs.rm(pidFile, { force: true });
+    if (startup.error) {
+      this.process.stderr.write(
+        `Daemon failed to start: ${startup.error.message}. Check ${logFile}\n`,
+      );
+      return;
+    }
+
+    const details = startup.signal
+      ? `signal ${startup.signal}`
+      : `exit code ${startup.code ?? "unknown"}`;
+    this.process.stderr.write(
+      `Daemon exited during startup (${details}). Check ${logFile}\n`,
+    );
+    return;
+  }
+
   child.unref();
   await fs.writeFile(pidFile, String(child.pid), "utf-8");
-  this.process.stdout.write(`stenobot daemon started (PID: ${child.pid})\n`);
+  this.process.stdout.write(
+    `stenobot daemon started (PID: ${child.pid})\nlogs: ${logFile}\n`,
+  );
+}
+
+function waitForChildStartup(
+  child: ReturnType<typeof spawn>,
+  timeoutMs: number,
+): Promise<ChildStartupResult> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const settle = (result: ChildStartupResult) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const timer = setTimeout(
+      () => settle({ exited: false, code: null, signal: null }),
+      timeoutMs,
+    );
+
+    child.once("error", (error) => settle({ exited: true, code: null, signal: null, error }));
+    child.once("exit", (code, signal) => settle({ exited: true, code, signal }));
+  });
 }
 
 async function runDaemon(ctx: LocalContext): Promise<void> {

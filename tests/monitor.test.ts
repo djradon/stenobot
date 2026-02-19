@@ -6,7 +6,7 @@ import { SessionMonitor } from "../src/core/monitor.js";
 import { StateManager } from "../src/core/state.js";
 import { ProviderRegistry } from "../src/providers/registry.js";
 import type { Provider } from "../src/providers/base.js";
-import type { Session, CloggerConfig } from "../src/types/index.js";
+import type { Session, StenobotConfig } from "../src/types/index.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -14,10 +14,10 @@ import type { Session, CloggerConfig } from "../src/types/index.js";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "claude-session.jsonl");
 
-function makeConfig(overrides: Partial<CloggerConfig> = {}): CloggerConfig {
+function makeConfig(overrides: Partial<StenobotConfig> = {}): StenobotConfig {
   return {
     providers: { "test-provider": { enabled: true } },
-    outputDirectory: "/tmp/clogger-test-output",
+    outputDirectory: "/tmp/stenobot-test-output",
     fileNamingTemplate: "conv.{provider}.{date}.{session-short}.md",
     metadata: {
       includeTimestamps: true,
@@ -27,7 +27,7 @@ function makeConfig(overrides: Partial<CloggerConfig> = {}): CloggerConfig {
       truncateToolResults: 1000,
     },
     monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
-    daemon: { pidFile: "~/.clogger/daemon.pid", logFile: "~/.clogger/daemon.log" },
+    daemon: { pidFile: "~/.stenobot/daemon.pid", logFile: "~/.stenobot/daemon.log" },
     ...overrides,
   };
 }
@@ -57,7 +57,7 @@ function makeTestProvider(sessionFilePath: string, sessionId: string): Provider 
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "clogger-monitor-test-"));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-monitor-test-"));
 });
 
 afterEach(async () => {

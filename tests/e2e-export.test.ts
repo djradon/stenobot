@@ -25,7 +25,7 @@ describe("end-to-end export", () => {
     expect(messages).toHaveLength(4);
 
     // Phase 2: Export to temp file
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "clogger-test-"));
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-test-"));
     const outputPath = path.join(tmpDir, "test-export.md");
 
     try {
@@ -88,7 +88,7 @@ describe("end-to-end export", () => {
   });
 
   it("appends to an existing file without adding frontmatter", async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "clogger-test-"));
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "stenobot-test-"));
     const outputPath = path.join(tmpDir, "existing.md");
 
     try {
