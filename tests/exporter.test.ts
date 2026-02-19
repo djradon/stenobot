@@ -2,6 +2,13 @@ import { describe, it, expect } from "vitest";
 import { formatMessage, renderToString } from "../src/core/exporter.js";
 import type { ExportOptions } from "../src/core/exporter.js";
 import type { Message } from "../src/types/index.js";
+import { formatInTimeZone } from "date-fns-tz";
+
+/** Format an ISO timestamp into the heading timestamp part using local timezone */
+function localHeading(iso: string): string {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return formatInTimeZone(new Date(iso), tz, "yyyy-MM-dd_HHmm_ss");
+}
 
 const baseOptions: ExportOptions = {
   metadata: {
@@ -37,13 +44,13 @@ function makeAssistantMessage(overrides: Partial<Message> = {}): Message {
 describe("formatMessage", () => {
   it("formats user message with italics and User heading", () => {
     const result = formatMessage(makeUserMessage(), baseOptions);
-    expect(result).toContain("# User_2026-02-10_2336_18");
+    expect(result).toContain(`# User_${localHeading("2026-02-10T23:36:18.000Z")}`);
     expect(result).toContain("*Hello, can you help?*");
   });
 
   it("uses model name in assistant heading when available", () => {
     const result = formatMessage(makeAssistantMessage(), baseOptions);
-    expect(result).toContain("# claude-opus-4.6_2026-02-10_2336_25");
+    expect(result).toContain(`# claude-opus-4.6_${localHeading("2026-02-10T23:36:25.000Z")}`);
     expect(result).toContain("Of course! I'd be happy to help.");
     // Content should NOT be italicized
     expect(result).not.toMatch(/\*Of course/);
@@ -52,7 +59,7 @@ describe("formatMessage", () => {
   it("falls back to speaker name when model is missing", () => {
     const msg = makeAssistantMessage({ model: undefined });
     const result = formatMessage(msg, baseOptions);
-    expect(result).toContain("# Claude_2026-02-10_2336_25");
+    expect(result).toContain(`# Claude_${localHeading("2026-02-10T23:36:25.000Z")}`);
   });
 
   it("uses custom speaker names", () => {
@@ -61,7 +68,7 @@ describe("formatMessage", () => {
       speakerNames: { user: "Dave", assistant: "AI" },
     };
     const userResult = formatMessage(makeUserMessage(), opts);
-    expect(userResult).toContain("# Dave_2026-02-10_2336_18");
+    expect(userResult).toContain(`# Dave_${localHeading("2026-02-10T23:36:18.000Z")}`);
 
     // Custom assistant name is overridden by model when model is present
     const assistantResult = formatMessage(makeAssistantMessage(), opts);
@@ -72,7 +79,7 @@ describe("formatMessage", () => {
       makeAssistantMessage({ model: undefined }),
       opts,
     );
-    expect(noModelResult).toContain("# AI_2026-02-10_2336_25");
+    expect(noModelResult).toContain(`# AI_${localHeading("2026-02-10T23:36:25.000Z")}`);
   });
 
   it("escapes asterisks in user messages", () => {

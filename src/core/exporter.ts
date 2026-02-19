@@ -3,11 +3,11 @@ import path from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { formatInTimeZone } from "date-fns-tz";
 import { nanoid } from "nanoid";
-import type { Message, CloggerConfig } from "../types/index.js";
+import type { Message, StenobotConfig } from "../types/index.js";
 
 export interface ExportOptions {
   title?: string;
-  metadata: CloggerConfig["metadata"];
+  metadata: StenobotConfig["metadata"];
   speakerNames?: {
     user?: string;
     assistant?: string;
@@ -49,24 +49,35 @@ function formatMessageHeading(
   } else {
     speaker = speakerNames?.assistant ?? "Claude";
   }
-  const formatted = formatInTimeZone(date, "UTC", "yyyy-MM-dd_HHmm_ss");
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const formatted = formatInTimeZone(date, tz, "yyyy-MM-dd_HHmm_ss");
   return `# ${speaker}_${formatted}`;
 }
 
-/** Format a single message to markdown */
-export function formatMessage(message: Message, options: ExportOptions): string {
+/** Format a single message to markdown.
+ *
+ * When `includeHeading` is false the speaker/timestamp heading is omitted —
+ * used by `renderToString` to merge consecutive same-role turns.
+ */
+export function formatMessage(
+  message: Message,
+  options: ExportOptions,
+  { includeHeading = true }: { includeHeading?: boolean } = {},
+): string {
   const parts: string[] = [];
 
   // Heading with timestamp
-  parts.push(
-    formatMessageHeading(
-      message.role,
-      message.timestamp,
-      message.model,
-      options.speakerNames,
-    ),
-  );
-  parts.push("");
+  if (includeHeading) {
+    parts.push(
+      formatMessageHeading(
+        message.role,
+        message.timestamp,
+        message.model,
+        options.speakerNames,
+      ),
+    );
+    parts.push("");
+  }
 
   // Message content
   if (message.role === "user" && options.metadata.italicizeUserMessages) {
@@ -123,7 +134,8 @@ export function formatMessage(message: Message, options: ExportOptions): string 
     parts.push("</details>");
   }
 
-  return parts.join("\n");
+  // Clean up: collapse 3+ consecutive newlines to 2, trim trailing whitespace
+  return parts.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
 /** Check if a message has no visible content to render */
@@ -134,7 +146,11 @@ function isEmptyMessage(message: Message, options: ExportOptions): boolean {
   return true;
 }
 
-/** Render messages to a markdown string (no file I/O) */
+/** Render messages to a markdown string (no file I/O).
+ *
+ * Consecutive messages from the same role are merged under one heading —
+ * a new heading is only emitted when the speaker actually changes.
+ */
 export function renderToString(
   messages: Message[],
   options: ExportOptions & { includeFrontmatter?: boolean },
@@ -148,10 +164,17 @@ export function renderToString(
     parts.push("");
   }
 
+  let lastRole: string | null = null;
+
   for (const message of messages) {
     if (isEmptyMessage(message, options)) continue;
-    parts.push(formatMessage(message, options));
+
+    const includeHeading = message.role !== lastRole;
+    const formatted = formatMessage(message, options, { includeHeading });
+
+    parts.push(formatted);
     parts.push("");
+    lastRole = message.role;
   }
 
   return parts.join("\n");

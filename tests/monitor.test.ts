@@ -6,7 +6,7 @@ import { SessionMonitor } from "../src/core/monitor.js";
 import { StateManager } from "../src/core/state.js";
 import { ProviderRegistry } from "../src/providers/registry.js";
 import type { Provider } from "../src/providers/base.js";
-import type { Message, Session, CloggerConfig } from "../src/types/index.js";
+import type { Session, CloggerConfig } from "../src/types/index.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -26,8 +26,7 @@ function makeConfig(overrides: Partial<CloggerConfig> = {}): CloggerConfig {
       italicizeUserMessages: true,
       truncateToolResults: 1000,
     },
-    recording: { captureMode: "full-session", multipleTargets: "replace" },
-    monitoring: { pollInterval: 60000, stateUpdateInterval: 60000 },
+    monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
     daemon: { pidFile: "~/.clogger/daemon.pid", logFile: "~/.clogger/daemon.log" },
     ...overrides,
   };
@@ -70,7 +69,7 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("SessionMonitor command handling", () => {
-  it("::record triggers full session export and sets recording state", async () => {
+  it("::record sets recording state without exporting pre-existing messages", async () => {
     const stateDir = path.join(tmpDir, "state");
     const outputFile = path.join(tmpDir, "record-output.md");
     const state = new StateManager(stateDir);
@@ -108,10 +107,8 @@ describe("SessionMonitor command handling", () => {
     expect(recording).toBeDefined();
     expect(recording!.outputFile).toBe(outputFile);
 
-    // Output file should exist with content
-    const content = await fs.readFile(outputFile, "utf-8");
-    expect(content).toMatch(/^---\n/); // has frontmatter
-    expect(content).toContain("# "); // has message headings
+    // Output file should NOT exist yet (no retroactive export)
+    await expect(fs.access(outputFile)).rejects.toThrow();
   });
 
   it("::export triggers full session export without recording state", async () => {
@@ -152,7 +149,7 @@ describe("SessionMonitor command handling", () => {
     expect(content).toMatch(/^---\n/);
   });
 
-  it("::capture triggers full session export and sets recording state", async () => {
+  it("::capture exports full pre-existing session and sets recording state", async () => {
     const stateDir = path.join(tmpDir, "state");
     const outputFile = path.join(tmpDir, "capture-output.md");
     const state = new StateManager(stateDir);
@@ -289,15 +286,16 @@ describe("SessionMonitor command handling", () => {
     const sessionFile = path.join(tmpDir, "session.jsonl");
     await fs.copyFile(FIXTURE, sessionFile);
 
-    // Use a command with @ prefix and relative path
-    const homePath = path.join(os.homedir(), "clogger-test-at-resolve.md");
+    // Use @ prefix + tilde path that resolves under tmpDir via a symlink-free absolute
+    // We test the resolution logic by pointing into tmpDir itself
+    const outputFile = path.join(tmpDir, "at-resolve-output.md");
     const recordCmd = JSON.stringify({
       type: "user",
       uuid: "cmd-at",
       timestamp: "2026-02-11T00:00:00Z",
       message: {
         role: "user",
-        content: [{ type: "text", text: "::record @~/clogger-test-at-resolve" }],
+        content: [{ type: "text", text: `::record @${outputFile}` }],
       },
     });
     await fs.appendFile(sessionFile, "\n" + recordCmd + "\n");
@@ -314,10 +312,142 @@ describe("SessionMonitor command handling", () => {
 
     const recording = state.getRecording("test-session");
     expect(recording).toBeDefined();
-    // Should have resolved ~ and added .md extension
-    expect(recording!.outputFile).toBe(homePath);
+    // Should have stripped @ prefix; path is already absolute with .md
+    expect(recording!.outputFile).toBe(outputFile);
+  });
+});
 
-    // Clean up the created file
-    await fs.rm(homePath, { force: true });
+describe("SessionMonitor recency filter", () => {
+  /** Create a provider whose discoverSessions yields a session with a given lastModified */
+  function makeTimedProvider(
+    sessionFilePath: string,
+    sessionId: string,
+    lastModified: Date,
+  ): Provider {
+    return {
+      name: "test-provider",
+      async *discoverSessions(): AsyncIterable<Session> {
+        yield {
+          id: sessionId,
+          provider: "test-provider",
+          filePath: sessionFilePath,
+          lastModified,
+        };
+      },
+      async *parseMessages(filePath: string, fromOffset?: number) {
+        const { parseClaudeMessages } = await import(
+          "../src/providers/claude-code/parser.js"
+        );
+        yield* parseClaudeMessages(filePath, fromOffset);
+      },
+    };
+  }
+
+  it("skips old sessions", async () => {
+    const stateDir = path.join(tmpDir, "state");
+    const state = new StateManager(stateDir);
+    await state.load();
+
+    const sessionFile = path.join(tmpDir, "session.jsonl");
+    await fs.copyFile(FIXTURE, sessionFile);
+
+    // Session last modified 2 hours ago
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const provider = makeTimedProvider(sessionFile, "old-session", twoHoursAgo);
+
+    const config = makeConfig({
+      monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
+    });
+    const registry = new ProviderRegistry();
+    registry.register(provider);
+
+    const monitor = new SessionMonitor(registry, state, config);
+
+    // @ts-expect-error accessing private method for testing
+    await monitor.discoverAndWatch();
+
+    // @ts-expect-error accessing private field for testing
+    expect(monitor.watchers.size).toBe(0);
+  });
+
+  it("watches recent sessions", async () => {
+    const stateDir = path.join(tmpDir, "state");
+    const state = new StateManager(stateDir);
+    await state.load();
+
+    const sessionFile = path.join(tmpDir, "session.jsonl");
+    await fs.copyFile(FIXTURE, sessionFile);
+
+    // Session last modified 5 minutes ago
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const provider = makeTimedProvider(sessionFile, "recent-session", fiveMinAgo);
+
+    const config = makeConfig({
+      monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
+    });
+    const registry = new ProviderRegistry();
+    registry.register(provider);
+
+    const monitor = new SessionMonitor(registry, state, config);
+
+    // @ts-expect-error accessing private method for testing
+    await monitor.discoverAndWatch();
+
+    // @ts-expect-error accessing private field for testing
+    expect(monitor.watchers.size).toBe(1);
+
+    await monitor.stop();
+  });
+
+  it("prunes stale watchers on rescan", async () => {
+    const stateDir = path.join(tmpDir, "state");
+    const state = new StateManager(stateDir);
+    await state.load();
+
+    const sessionFile = path.join(tmpDir, "session.jsonl");
+    await fs.copyFile(FIXTURE, sessionFile);
+
+    // First scan: session is recent
+    let lastModified = new Date();
+    const provider: Provider = {
+      name: "test-provider",
+      async *discoverSessions(): AsyncIterable<Session> {
+        yield {
+          id: "aging-session",
+          provider: "test-provider",
+          filePath: sessionFile,
+          lastModified,
+        };
+      },
+      async *parseMessages(filePath: string, fromOffset?: number) {
+        const { parseClaudeMessages } = await import(
+          "../src/providers/claude-code/parser.js"
+        );
+        yield* parseClaudeMessages(filePath, fromOffset);
+      },
+    };
+
+    const config = makeConfig({
+      monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
+    });
+    const registry = new ProviderRegistry();
+    registry.register(provider);
+
+    const monitor = new SessionMonitor(registry, state, config);
+
+    // @ts-expect-error accessing private method for testing
+    await monitor.discoverAndWatch();
+
+    // @ts-expect-error accessing private field for testing
+    expect(monitor.watchers.size).toBe(1);
+
+    // Second scan: session is now old
+    lastModified = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+    // @ts-expect-error accessing private method for testing
+    await monitor.discoverAndWatch();
+
+    // @ts-expect-error accessing private field for testing
+    expect(monitor.watchers.size).toBe(0);
   });
 });

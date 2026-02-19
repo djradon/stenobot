@@ -10,6 +10,6 @@ export const startCommand = buildCommand({
     flags: {},
   },
   docs: {
-    brief: "Start the clogger monitoring daemon",
+    brief: "Start the stenobot monitoring daemon",
   },
 });

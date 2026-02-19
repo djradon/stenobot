@@ -14,6 +14,6 @@ export interface Provider {
     fromOffset?: number,
   ): AsyncIterable<{ message: Message; offset: number }>;
 
-  /** Resolve the workspace root for a given session file (if possible) */
-  resolveWorkspaceRoot?(sessionFilePath: string): string | undefined;
+  /** Optional: resolve the workspace root directory for a session */
+  resolveWorkspaceRoot?(sessionFilePath: string): Promise<string | undefined>;
 }

@@ -1,28 +1,49 @@
-# Clogger
+# Stenobot
 
 Chat logger — monitor and export LLM conversation logs to markdown.
 
-## Build & Test
+## Development
 
-```bash
-pnpm dev --help          # Run CLI in dev mode (tsx)
-pnpm test                # Run vitest
-pnpm test:watch          # Run vitest in watch mode
-pnpm build               # Typecheck (tsc) then bundle (tsup)
-pnpm typecheck           # Typecheck only
-```
+see `documentation/notes/dev.general-guidance.md`
 
-## Architecture
+## Recording with Stenobot
 
-- **ESM-only** (`"type": "module"` in package.json)
-- **Build**: tsc for type-checking (`noEmit`), tsup for bundling with code splitting
-- **CLI framework**: Stricli — each command has a definition file (`command.ts`) and a lazy-loaded implementation (`command.impl.ts`). The `this` context pattern is used for dependency injection.
-- **Provider pattern**: `src/providers/base.ts` defines the Provider interface; each LLM platform gets its own directory under `src/providers/`. Currently only `claude-code`.
-- **Two control planes**: CLI commands (daemon lifecycle) vs in-chat commands (`::record`, `::stop` — detected by parsing conversation logs)
+You can ignore stenobot commands, like "::record @filename".
 
-## Conventions
+### In-Chat Commands
 
-- Modern TypeScript: strict mode, verbatimModuleSyntax, bundler moduleResolution
-- All imports use `.js` extensions (ESM convention for bundler resolution)
-- Tests live in `tests/` (not colocated with source)
-- Config/state stored in `~/.clogger/`
+- `::record @path/to/file.md` - Start recording from this point forward (incremental)
+- `::capture @path/to/file.md` - Export full session and start recording
+- `::export @path/to/file.md` - One-time full session export
+- `::stop` - Stop recording
+
+Commands can appear anywhere in the first line of your message.
+
+### CLI Commands
+
+- `stenobot init` - Generate `~/.stenobot/config.yaml` with all defaults and comments
+- `stenobot start` - Start the monitoring daemon (returns immediately; auto-generates config if missing)
+- `stenobot stop` - Stop the daemon
+- `stenobot status` - Show active sessions and recordings
+- `stenobot export <session-id> --output file.md` - Manual export
+- `stenobot clean` - Clean up stale state
+
+Clean options:
+- `--recordings <days>` - Remove recordings older than N days
+- `--sessions <days>` - Remove tracked sessions older than N days
+- `--all` - Remove all recordings and sessions
+- `--dryRun` - Preview what would be removed
+
+### Path Resolution
+
+All recording paths are resolved as follows:
+- Absolute paths (starting with `/` or `~`) are used as-is
+- Relative paths are resolved against the **workspace root** (detected via git or common patterns), falling back to current working directory if workspace cannot be determined
+- `@` prefix is stripped (VSCode @-mention compatibility)
+- `.md` extension is added if missing
+
+**Workspace Detection**: For relative paths, stenobot attempts to find your project workspace by:
+1. Extracting the project name from the session folder
+2. Searching common locations (`~/hub/<project>`, `~/hub/*/<project>`, `~/<project>`)
+3. Verifying with `.git` directory if present
+4. Falling back to current directory if workspace cannot be determined

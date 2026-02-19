@@ -3,13 +3,17 @@ import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
 import { exportCommand } from "./commands/export.js";
+import { cleanCommand } from "./commands/clean.js";
+import { initCommand } from "./commands/init.js";
 
 const routes = buildRouteMap({
   routes: {
+    init: initCommand,
     start: startCommand,
     stop: stopCommand,
     status: statusCommand,
     export: exportCommand,
+    clean: cleanCommand,
   },
   docs: {
     brief: "Chat logger — monitor and export LLM conversation logs to markdown",
@@ -17,7 +21,7 @@ const routes = buildRouteMap({
 });
 
 export const app = buildApplication(routes, {
-  name: "clogger",
+  name: "stenobot",
   versionInfo: {
     currentVersion: "0.1.0",
   },

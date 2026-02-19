@@ -10,6 +10,6 @@ export const stopCommand = buildCommand({
     flags: {},
   },
   docs: {
-    brief: "Stop the clogger monitoring daemon",
+    brief: "Stop the stenobot monitoring daemon",
   },
 });

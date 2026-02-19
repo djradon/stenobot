@@ -74,10 +74,7 @@ export type InChatCommandName =
   | "record"
   | "export"
   | "capture"
-  | "stop"
-  | "pause"
-  | "resume"
-  | "status";
+  | "stop";
 
 export interface InChatCommand {
   name: InChatCommandName;
@@ -87,7 +84,7 @@ export interface InChatCommand {
 }
 
 /** Configuration schema */
-export interface CloggerConfig {
+export interface StenobotConfig {
   providers: Record<
     string,
     {
@@ -105,13 +102,10 @@ export interface CloggerConfig {
     italicizeUserMessages: boolean;
     truncateToolResults: number;
   };
-  recording: {
-    captureMode: "full-session";
-    multipleTargets: "replace";
-  };
   monitoring: {
     pollInterval: number;
     stateUpdateInterval: number;
+    maxSessionAge: number;
   };
   daemon: {
     pidFile: string;

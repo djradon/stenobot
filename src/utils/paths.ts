@@ -9,9 +9,9 @@ export function expandHome(filePath: string): string {
   return filePath;
 }
 
-/** Default clogger config/state directory */
-export function getCloggerDir(): string {
-  return path.join(os.homedir(), ".clogger");
+/** Default stenobot config/state directory */
+export function getStenobotDir(): string {
+  return path.join(os.homedir(), ".stenobot");
 }
 
 /** Ensure a file path has a .md extension */

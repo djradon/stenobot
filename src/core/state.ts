@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AppState } from "../types/index.js";
-import { getCloggerDir } from "../utils/paths.js";
+import { getStenobotDir } from "../utils/paths.js";
 import { logger } from "../utils/logger.js";
 
 const STATE_FILE = "state.json";
@@ -17,7 +17,7 @@ export class StateManager {
   private dirty = false;
 
   constructor(stateDir?: string) {
-    this.statePath = path.join(stateDir ?? getCloggerDir(), STATE_FILE);
+    this.statePath = path.join(stateDir ?? getStenobotDir(), STATE_FILE);
   }
 
   /** Load persisted state from disk */
@@ -79,5 +79,17 @@ export class StateManager {
     sessionId: string,
   ): AppState["recordings"][string] | undefined {
     return this.state.recordings[sessionId];
+  }
+
+  removeSession(sessionId: string): void {
+    delete this.state.sessions[sessionId];
+    delete this.state.recordings[sessionId];
+    this.dirty = true;
+  }
+
+  /** Remove all sessions and recordings from state */
+  clearAll(): void {
+    this.state = structuredClone(DEFAULT_STATE);
+    this.dirty = true;
   }
 }

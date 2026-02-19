@@ -1,14 +1,20 @@
 {
-  "name": "clogger",
+  "name": "stenobot",
   "version": "0.1.0",
   "description": "Chat logger — monitor and export LLM conversation logs to markdown",
   "type": "module",
   "bin": {
-    "clogger": "dist/cli.js"
+    "stenobot": "dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "prebuild": "tsc -p src/tsconfig.json",
     "build": "tsup",
+    "prepublishOnly": "pnpm run build",
     "dev": "tsx src/bin/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",

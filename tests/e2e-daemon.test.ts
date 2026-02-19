@@ -53,8 +53,7 @@ function makeConfig(tmpDir: string): CloggerConfig {
       italicizeUserMessages: true,
       truncateToolResults: 1000,
     },
-    recording: { captureMode: "full-session", multipleTargets: "replace" },
-    monitoring: { pollInterval: 60000, stateUpdateInterval: 60000 },
+    monitoring: { pollInterval: 60000, stateUpdateInterval: 60000, maxSessionAge: 600000 },
     daemon: { pidFile: "~/.clogger/daemon.pid", logFile: "~/.clogger/daemon.log" },
   };
 }
@@ -94,16 +93,16 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe("e2e daemon lifecycle", () => {
-  it("processes ::record, appends new messages, then ::stop", async () => {
+  it("processes ::capture, appends new messages, then ::stop", async () => {
     const stateDir = path.join(tmpDir, "state");
     const sessionFile = path.join(tmpDir, "session.jsonl");
     const outputFile = path.join(tmpDir, "output.md");
 
-    // Build a session JSONL with a conversation + ::record command
+    // Build a session JSONL with a conversation + ::capture command
     const lines = [
       userEntry("u1", "Hello, can you help?", "2026-02-11T10:00:00Z"),
       assistantEntry("a1", "Of course! What do you need?", "2026-02-11T10:00:05Z"),
-      userEntry("u2", `::record ${outputFile}`, "2026-02-11T10:01:00Z"),
+      userEntry("u2", `::capture ${outputFile}`, "2026-02-11T10:01:00Z"),
       assistantEntry("a2", "Recording started.", "2026-02-11T10:01:02Z"),
     ];
     await fs.writeFile(sessionFile, lines.join("\n") + "\n");
@@ -117,7 +116,7 @@ describe("e2e daemon lifecycle", () => {
 
     const monitor = new SessionMonitor(registry, state, config);
 
-    // Process the session — should detect ::record and export full session
+    // Process the session — should detect ::capture and export full session
     // @ts-expect-error accessing private method for testing
     await monitor.processSession(provider, sessionFile, "test-session");
 

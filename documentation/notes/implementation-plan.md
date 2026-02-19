@@ -2,7 +2,7 @@
 id: b10bo18sfpettzqb535rkkh
 title: Implementation Plan
 desc: ''
-updated: 1770849234734
+updated: 1770881107103
 created: 1770799535662
 ---
 
@@ -382,8 +382,9 @@ Location: `~/.clogger/config.json`
     "multipleTargets": "replace"
   },
   "monitoring": {
-    "pollInterval": 5000,
-    "stateUpdateInterval": 10000
+    "pollInterval": 60000,
+    "stateUpdateInterval": 10000,
+    "maxSessionAge": 600000
   },
   "daemon": {
     "pidFile": "~/.clogger/daemon.pid",
@@ -415,7 +416,7 @@ Location: `~/.clogger/config.json`
 - [x] Markdown exporter: Dendron frontmatter, `renderToString()`, append-to-existing-file support
 - [x] Thinking blocks and tool calls in collapsible `<details>` sections
 - [x] `--thinking`, `--toolCalls`, `--italics` CLI flags override config defaults
-- [x] UTC timestamps via `date-fns-tz`
+- [x] Timestamps via `date-fns-tz` (local timezone)
 - [x] 35 tests: parser (11), exporter (14), detector (8), e2e (2)
 
 **Deliverable**: CLI tool that can export existing Claude Code session JSONL to markdown
@@ -423,18 +424,24 @@ Location: `~/.clogger/config.json`
 ### Phase 2: Real-time Monitoring ✅
 - [x] Session Monitor with chokidar file watching, processSession pipeline
 - [x] In-Chat Command handling: `::record`, `::export`, `::capture`, `::stop`
-- [x] `::record`/`::capture` = full session overwrite + set recording state
-- [x] `::export` = one-shot full session dump (no recording state)
+- [x] `::capture` = export full pre-existing session + start continuous recording of future turns
+- [x] `::record` = forward-only recording (no retroactive export); only records messages after the command
+- [x] `::export` = one-shot full session dump (no continuous recording)
 - [x] `::stop` = remove recording state
 - [x] Export modes: `overwrite` (full-session commands) vs `create-or-append` (incremental)
 - [x] `exportFullSession()` helper for full-session re-export from offset 0
 - [x] State Manager with atomic writes, dirty flag, session/recording CRUD
-- [x] PID file management in `start.impl.ts` (write on start, clean on shutdown)
+- [x] PID file management using `config.daemon.pidFile` (write on start, clean on shutdown)
 - [x] Incremental export: append only new messages to active recording files
 - [x] Output path resolution: absolute, relative, @-mention prefix, tilde expansion
 - [x] Text cleaning: strip ANSI escape codes, system/IDE tags, collapse whitespace
 - [x] H1 (`#`) turn headings (avoids clash with Claude's `##` content headings)
-- [x] 50 tests: parser (11), exporter (14), detector (10), state (6), monitor (6), e2e-export (2), e2e-daemon (1)
+- [x] Preserve existing YAML frontmatter in overwrite mode
+- [x] Filter empty turns (no visible content)
+- [x] Recency-based session monitoring: only watch sessions modified within `maxSessionAge` (default 10 min), prune stale watchers on each rescan
+- [x] Local timezone for turn heading timestamps (was UTC)
+- [x] `clogger status`: daemon alive check (PID), workspace labels, relative timestamps, summary counts
+- [x] 53 tests: parser (11), exporter (14), detector (10), state (6), monitor (9), e2e-export (2), e2e-daemon (1)
 
 **Deliverable**: Background daemon that monitors Claude Code sessions and auto-exports based on in-chat commands
 
@@ -451,17 +458,20 @@ Location: `~/.clogger/config.json`
 - [ ] State cleanup for old sessions
 - [ ] Enhanced error handling and logging
 - [ ] Configuration management
-- [ ] Status/info commands
-- [ ] Documentation
+- [x] Status/info commands
+- [x] Documentation
 
 **Deliverable**: Production-ready tool with full features
 
-### Phase 4: Enhancements
-- [ ] Multiple output format support
+### Phase 4: Possible Enhancements
 - [ ] Filter/exclude certain messages
 - [ ] Conversation search/indexing
-- [ ] Web dashboard for managing recordings
 - [ ] Integration with other note-taking tools
+
+### Rejected
+- [ ] Multiple output format support
+- [ ] Web dashboard for managing recordings
+
 
 ## Cross-Platform Considerations
 
@@ -525,7 +535,9 @@ Location: `~/.clogger/config.json`
 9. ✅ **Message format**: Each message gets H1 heading with timestamp (`# Speaker_YYYY-MM-DD_HHMM_SS`)
 10. ✅ **User message styling**: Italicized for visual distinction
 11. ✅ **Metadata defaults**: Timestamps ON, tool calls/thinking blocks OFF (but configurable)
-12. ✅ **Export vs Record vs Capture**: `::export` = one-shot dump, `::record`/`::capture` = dump + continuous recording
+12. ✅ **Export vs Capture vs Record**: `::export` = one-shot dump, `::capture` = export full pre-existing session + record future turns, `::record` = synonym for `::capture`
+13. ✅ **Recency filter**: Only watch sessions modified within `maxSessionAge` (default 10 min), rescan every 60s, prune stale watchers
+14. ✅ **Local timezone**: Turn heading timestamps use system local timezone, not UTC
 
 ### CLI Commands (Daemon Control)
 
@@ -542,8 +554,8 @@ Location: `~/.clogger/config.json`
 
 | Command                  | Description                                              | Example                              |
 | ------------------------ | -------------------------------------------------------- | ------------------------------------ |
-| `::record <filename>`    | Export full session + start continuous recording          | `::record @private-notes/my-conv.md` |
-| `::capture <filename>`   | Same as `::record` (alias)                               | `::capture conv.design.md`           |
+| `::capture <filename>`   | Export full pre-existing session + record future turns    | `::capture conv.design.md`           |
+| `::record <filename>`    | Synonym for `::capture`                                  | `::record @private-notes/my-conv.md` |
 | `::export <filename>`    | One-shot full session export (no continuous recording)    | `::export session-dump.md`           |
 | `::stop`                 | Stop current recording                                   | `::stop`                             |
 | `::pause`                | Pause recording (planned)                                | `::pause`                            |

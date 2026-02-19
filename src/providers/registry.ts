@@ -1,12 +1,12 @@
 import type { Provider } from "./base.js";
-import type { CloggerConfig } from "../types/index.js";
+import type { StenobotConfig } from "../types/index.js";
 import { ClaudeCodeProvider } from "./claude-code/index.js";
 
 /** Registry of available LLM providers */
 export class ProviderRegistry {
   private readonly providers = new Map<string, Provider>();
 
-  constructor(config?: CloggerConfig) {
+  constructor(config?: StenobotConfig) {
     // Register built-in providers with config-driven settings
     const claudeConfig = config?.providers["claude-code"];
     this.register(new ClaudeCodeProvider(claudeConfig?.sessionPaths));

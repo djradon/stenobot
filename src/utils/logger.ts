@@ -1,13 +1,13 @@
 import winston from "winston";
 
 export const logger = winston.createLogger({
-  level: process.env["CLOGGER_LOG_LEVEL"] ?? "info",
+  level: process.env["STENOBOT_LOG_LEVEL"] ?? "info",
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
     winston.format.json(),
   ),
-  defaultMeta: { service: "clogger" },
+  defaultMeta: { service: "stenobot" },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(

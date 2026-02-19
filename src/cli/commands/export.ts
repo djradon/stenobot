@@ -10,8 +10,9 @@ export const exportCommand = buildCommand({
       kind: "tuple",
       parameters: [
         {
-          brief: "Session ID to export",
+          brief: "Session ID or path to session JSONL file",
           parse: String,
+          placeholder: "session-id",
         },
       ],
     },
