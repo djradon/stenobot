@@ -157,6 +157,70 @@ More text after`;
     expect(result?.name).toBe("capture");
     expect(result?.args).toBe("@notes/session.md");
   });
+
+  // --- stricter parsing ---
+
+  it("signals auto-generate when file command has no args (args = '')", () => {
+    expect(detectCommand("::capture")).toEqual({
+      name: "capture",
+      args: "",
+      rawMessage: "::capture",
+    });
+    expect(detectCommand("::record")).toEqual({
+      name: "record",
+      args: "",
+      rawMessage: "::record",
+    });
+    expect(detectCommand("::export")).toEqual({
+      name: "export",
+      args: "",
+      rawMessage: "::export",
+    });
+  });
+
+  it("strips leading 'to' bridge word before the path", () => {
+    expect(detectCommand("::record to notes.md")?.args).toBe("notes.md");
+    expect(detectCommand("::capture to @notes/conv.md")?.args).toBe("@notes/conv.md");
+    expect(detectCommand("::capture TO ~/docs/log.md")?.args).toBe("~/docs/log.md");
+  });
+
+  it("extracts @-mention path preceded by natural language including 'to'", () => {
+    const result = detectCommand(
+      "I'm going to ::capture this conversation to @documentation/notes/conv.md"
+    );
+    expect(result?.name).toBe("capture");
+    expect(result?.args).toBe("@documentation/notes/conv.md");
+  });
+
+  it("ignores file commands in backtick code spans", () => {
+    expect(detectCommand("`::capture notes.md`")).toBeNull();
+    expect(detectCommand("use `::record file.md` to start")).toBeNull();
+  });
+
+  it("ignores file commands embedded in prose without a recognisable path", () => {
+    expect(detectCommand("the docs discuss ::capture in detail")).toBeNull();
+    expect(detectCommand("use ::record to log this conversation")).toBeNull();
+    expect(detectCommand("::capture but the explanatory text")).toBeNull();
+  });
+
+  it("extracts quoted path that contains spaces", () => {
+    expect(detectCommand('::capture "my notes/session.md"')?.args).toBe("my notes/session.md");
+    expect(detectCommand("::record 'docs/my session.md'")?.args).toBe("docs/my session.md");
+  });
+
+  it("accepts filename without .md extension (extension added later)", () => {
+    expect(detectCommand("::record my-session")?.args).toBe("my-session");
+    expect(detectCommand("::capture notes/todays-log")?.args).toBe("notes/todays-log");
+  });
+
+  it("accepts Windows absolute paths", () => {
+    expect(detectCommand("::record C:\\Users\\notes\\file.md")?.args).toBe(
+      "C:\\Users\\notes\\file.md"
+    );
+    expect(detectCommand("::capture \\\\server\\share\\file.md")?.args).toBe(
+      "\\\\server\\share\\file.md"
+    );
+  });
 });
 
 describe("detectAllCommands", () => {
@@ -195,5 +259,23 @@ Let's record this.`;
   it("returns empty array when no commands found", () => {
     const results = detectAllCommands("just some text");
     expect(results).toEqual([]);
+  });
+
+  it("skips prose-only file commands and still detects valid ones", () => {
+    const message = `Use ::capture to start recording, then later:
+
+::capture @notes/session.md`;
+
+    const results = detectAllCommands(message);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.name).toBe("capture");
+    expect(results[0]?.args).toBe("@notes/session.md");
+  });
+
+  it("does not detect backtick-wrapped commands", () => {
+    const message = "Run `::capture notes.md` to begin.\n\n::stop";
+    const results = detectAllCommands(message);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.name).toBe("stop");
   });
 });

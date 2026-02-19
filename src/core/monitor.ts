@@ -7,7 +7,19 @@ import { exportToMarkdown } from "./exporter.js";
 import { ensureMarkdownExtension, expandHome } from "../utils/paths.js";
 import { logger } from "../utils/logger.js";
 import type { CloggerConfig, Message } from "../types/index.js";
+import fs from "node:fs/promises";
 import path from "node:path";
+
+/** Convert a string to a URL-safe slug for use in auto-generated filenames */
+function slugify(text: string): string {
+  const result = text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return result || "session";
+}
 
 export class SessionMonitor {
   private watchers = new Map<string, FSWatcher>();
@@ -229,7 +241,9 @@ export class SessionMonitor {
   ): Promise<void> {
     switch (name) {
       case "capture": {
-        const outputFile = await this.resolveOutputPath(args, provider, filePath);
+        const outputFile = args
+          ? await this.resolveOutputPath(args, provider, filePath)
+          : await this.generateAutoPath(filePath, provider);
         logger.info("Capturing session", { sessionId, outputFile });
 
         await this.exportFullSession(provider, filePath, outputFile);
@@ -243,7 +257,9 @@ export class SessionMonitor {
       }
 
       case "record": {
-        const outputFile = await this.resolveOutputPath(args, provider, filePath);
+        const outputFile = args
+          ? await this.resolveOutputPath(args, provider, filePath)
+          : await this.generateAutoPath(filePath, provider);
         logger.info("Starting recording", { sessionId, outputFile });
 
         this.state.setRecording(sessionId, {
@@ -255,7 +271,9 @@ export class SessionMonitor {
       }
 
       case "export": {
-        const outputFile = await this.resolveOutputPath(args, provider, filePath);
+        const outputFile = args
+          ? await this.resolveOutputPath(args, provider, filePath)
+          : await this.generateAutoPath(filePath, provider);
         logger.info("Exporting session", { sessionId, outputFile });
 
         await this.exportFullSession(provider, filePath, outputFile);
@@ -313,6 +331,47 @@ export class SessionMonitor {
     }
 
     return resolved;
+  }
+
+  /** Generate an output path when no filename was given, using a timestamp + session slug */
+  private async generateAutoPath(
+    sessionFilePath: string,
+    provider: Provider,
+  ): Promise<string> {
+    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const firstMessage = await this.getFirstUserMessage(sessionFilePath);
+    const slug = slugify(firstMessage ?? "session");
+    const filename = `${date}-${slug}.md`;
+
+    const workspaceRoot = provider.resolveWorkspaceRoot
+      ? await provider.resolveWorkspaceRoot(sessionFilePath)
+      : undefined;
+    return path.resolve(workspaceRoot ?? process.cwd(), filename);
+  }
+
+  /** Read the first non-system user message text from a session JSONL file */
+  private async getFirstUserMessage(filePath: string): Promise<string | null> {
+    try {
+      const content = await fs.readFile(filePath, "utf-8");
+      for (const line of content.split("\n").slice(0, 30)) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === "user" && parsed.message?.content) {
+            for (const block of parsed.message.content) {
+              if (block.type === "text" && block.text) {
+                const cleaned = (block.text as string)
+                  .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+                  .replace(/<ide_[^>]+>[\s\S]*?<\/ide_[^>]+>/g, "")
+                  .trim();
+                if (cleaned) return cleaned.replace(/\n/g, " ").slice(0, 80);
+              }
+            }
+          }
+        } catch { continue; }
+      }
+    } catch { /* ignore read errors */ }
+    return null;
   }
 
   private getEnabledProviders(): Provider[] {

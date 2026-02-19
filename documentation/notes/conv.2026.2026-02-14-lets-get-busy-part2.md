@@ -1307,3 +1307,10 @@ Both fixes are working:
 2. ✅ **No path duplication** - The redundant workspace basename is stripped before resolution
 
 The session is now being captured to the correct location!
+
+
+# claude-sonnet-4-5.20250929_2026-02-18_2232_00
+
+I can see the detector has been significantly enhanced with better path extraction logic! The changes include support for quoted paths with spaces, Windows paths, the "to" bridge word, and smart filtering of commands in backticks or prose-only contexts.
+
+Is there anything you'd like me to help with regarding these changes or the clogger project?
