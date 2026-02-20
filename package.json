@@ -31,7 +31,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.10"
   },
   "dependencies": {
     "@stricli/core": "^1.2.5",

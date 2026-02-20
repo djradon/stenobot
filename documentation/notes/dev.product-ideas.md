@@ -2,7 +2,7 @@
 id: 4a39f79yf72wtu9kbt0ijlk
 title: Product Ideas
 desc: ''
-updated: 1771545922581
+updated: 1771603849189
 created: 1771480304848
 ---
 
@@ -13,3 +13,5 @@ created: 1771480304848
 - support for gemini, kimi, etc
 - add an "interlocutors" YAML field, and maybe a sessionId filed as well. 
 - create a summary file (and/or decision log, maybe update a to-do file) on command
+- overhaul status
+- switch to deno and multi-agent structure
