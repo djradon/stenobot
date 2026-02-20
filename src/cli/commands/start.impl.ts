@@ -19,6 +19,51 @@ interface ChildStartupResult {
   error?: Error;
 }
 
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+async function readAlivePid(filePath: string): Promise<number | null> {
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    const pid = parseInt(raw.trim(), 10);
+    if (!Number.isFinite(pid)) return null;
+    return isProcessAlive(pid) ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+async function acquireDaemonLock(
+  lockPath: string,
+  pid: number,
+): Promise<{ acquired: boolean; existingPid: number | null }> {
+  try {
+    await fs.writeFile(lockPath, String(pid), { flag: "wx" });
+    return { acquired: true, existingPid: null };
+  } catch {
+    const existingPid = await readAlivePid(lockPath);
+    if (existingPid !== null) {
+      return { acquired: false, existingPid };
+    }
+
+    // Stale/corrupt lock: clear and retry once.
+    await fs.rm(lockPath, { force: true });
+    try {
+      await fs.writeFile(lockPath, String(pid), { flag: "wx" });
+      return { acquired: true, existingPid: null };
+    } catch {
+      const maybeLivePid = await readAlivePid(lockPath);
+      return { acquired: false, existingPid: maybeLivePid };
+    }
+  }
+}
+
 export async function startImpl(
   this: LocalContext,
   _flags: StartFlags,
@@ -37,6 +82,7 @@ export async function startImpl(
 
   const config = await loadConfig();
   const pidFile = expandHome(config.daemon.pidFile);
+  const lockFile = `${pidFile}.lock`;
   const pidDir = nodePath.dirname(pidFile);
   const logFile = expandHome(config.daemon.logFile);
   const logDir = nodePath.dirname(logFile);
@@ -47,25 +93,31 @@ export async function startImpl(
   try {
     await fs.writeFile(pidFile, "starting", { flag: "wx" });
   } catch {
-    // File already exists — check if the daemon is genuinely running
+    // Prefer lock file as source of truth for a running daemon.
+    const lockPid = await readAlivePid(lockFile);
+    if (lockPid !== null) {
+      // Heal stale/missing PID file for consistency.
+      await fs.writeFile(pidFile, String(lockPid), "utf-8");
+      this.process.stdout.write(
+        `stenobot daemon is already running (PID: ${lockPid})\n`,
+      );
+      return;
+    }
+
+    // No live daemon lock. Treat any existing PID file as stale.
     try {
       const existing = await fs.readFile(pidFile, "utf-8");
       const existingPid = parseInt(existing.trim(), 10);
-      if (!isNaN(existingPid)) {
-        try {
-          process.kill(existingPid, 0);
-          this.process.stdout.write(
-            `stenobot daemon is already running (PID: ${existingPid})\n`,
-          );
-          return;
-        } catch {
-          // Stale PID — process is gone
-        }
+      if (!isNaN(existingPid) && isProcessAlive(existingPid)) {
+        this.process.stderr.write(
+          `PID file pointed to live process ${existingPid} but no daemon lock was found. Treating PID file as stale.\n`,
+        );
       }
     } catch {
       // Could not read PID file
     }
-    // Stale or corrupt PID file — clear it and try once more
+
+    await fs.rm(lockFile, { force: true });
     await fs.rm(pidFile, { force: true });
     try {
       await fs.writeFile(pidFile, "starting", { flag: "wx" });
@@ -166,6 +218,18 @@ async function runDaemon(ctx: LocalContext): Promise<void> {
   const logFile = expandHome(config.daemon.logFile);
   await configureLogger({ logFile, includeConsole: false });
 
+  const pidFile = expandHome(config.daemon.pidFile);
+  const lockFile = `${pidFile}.lock`;
+  const lock = await acquireDaemonLock(lockFile, ctx.process.pid);
+  if (!lock.acquired) {
+    logger.error("Another daemon instance is already running", {
+      existingPid: lock.existingPid,
+      lockFile,
+    });
+    ctx.process.exit(1);
+    return;
+  }
+
   logger.info("Daemon process started", {
     pid: ctx.process.pid,
     logFile,
@@ -175,7 +239,6 @@ async function runDaemon(ctx: LocalContext): Promise<void> {
   const state = new StateManager();
   const monitor = new SessionMonitor(registry, state, config);
 
-  const pidFile = expandHome(config.daemon.pidFile);
   let shuttingDown = false;
 
   const shutdown = async (exitCode = 0) => {
@@ -197,6 +260,13 @@ async function runDaemon(ctx: LocalContext): Promise<void> {
       finalExitCode = 1;
     }
 
+    try {
+      await fs.rm(lockFile, { force: true });
+    } catch (error) {
+      logger.error("Error removing daemon lock file", { lockFile, error });
+      finalExitCode = 1;
+    }
+
     logger.info("Daemon process exiting", {
       pid: ctx.process.pid,
       exitCode: finalExitCode,
@@ -215,5 +285,10 @@ async function runDaemon(ctx: LocalContext): Promise<void> {
     void shutdown(1);
   });
 
-  await monitor.start();
+  try {
+    await monitor.start();
+  } catch (error) {
+    logger.error("Failed to start session monitor", { error });
+    await shutdown(1);
+  }
 }

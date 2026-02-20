@@ -2,7 +2,7 @@
 id: djmt4lrod2j7c72n6xjm47i
 title: General Guidance
 desc: ''
-updated: 1771535033353
+updated: 1771546041363
 created: 1770877019855
 ---
 ## Build & Test
@@ -14,6 +14,21 @@ pnpm test:watch          # Run vitest in watch mode
 pnpm build               # Typecheck (tsc) then bundle (tsup)
 pnpm typecheck           # Typecheck only
 ```
+
+## Daemon Control (Development)
+
+Use `pnpm dev` to control the daemon during development — this runs the CLI via `tsx` directly from source, avoiding the globally installed `stenobot` binary:
+
+```bash
+pnpm dev start    # Start the daemon (tsx, from source)
+pnpm dev stop     # Stop the daemon
+pnpm dev restart  # Stop then start (picks up code changes)
+pnpm dev status   # Show active sessions
+```
+
+After editing source files, run `pnpm dev restart` to reload the daemon with your changes.
+
+See [[dev.daemon-implementation]] for more details.
 
 ## Architecture
 

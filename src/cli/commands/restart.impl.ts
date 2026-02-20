@@ -18,16 +18,18 @@ function isProcessAlive(pid: number): boolean {
 }
 
 async function getRunningPid(pidFile: string): Promise<number | null> {
-  let pid: number;
+  // Daemon lock is authoritative for "actually running" state.
+  const lockFile = `${pidFile}.lock`;
   try {
-    const raw = await fs.readFile(pidFile, "utf-8");
-    pid = parseInt(raw.trim(), 10);
+    const lockRaw = await fs.readFile(lockFile, "utf-8");
+    const lockPid = parseInt(lockRaw.trim(), 10);
+    if (Number.isFinite(lockPid) && isProcessAlive(lockPid)) return lockPid;
   } catch {
-    return null;
+    // No lock or unreadable lock.
   }
 
-  if (!Number.isFinite(pid)) return null;
-  return isProcessAlive(pid) ? pid : null;
+  // No live lock => no confirmed running daemon.
+  return null;
 }
 
 async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {

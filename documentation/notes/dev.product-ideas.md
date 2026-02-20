@@ -2,7 +2,7 @@
 id: 4a39f79yf72wtu9kbt0ijlk
 title: Product Ideas
 desc: ''
-updated: 1771535796005
+updated: 1771545922581
 created: 1771480304848
 ---
 
@@ -12,3 +12,4 @@ created: 1771480304848
 - handle recording of "choices" options and chosen option
 - support for gemini, kimi, etc
 - add an "interlocutors" YAML field, and maybe a sessionId filed as well. 
+- create a summary file (and/or decision log, maybe update a to-do file) on command
