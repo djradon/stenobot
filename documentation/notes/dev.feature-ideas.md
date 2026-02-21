@@ -1,8 +1,8 @@
 ---
 id: 4a39f79yf72wtu9kbt0ijlk
-title: Product Ideas
+title: Feature Ideas
 desc: ''
-updated: 1771603849189
+updated: 1771635058635
 created: 1771480304848
 ---
 
@@ -14,4 +14,5 @@ created: 1771480304848
 - add an "interlocutors" YAML field, and maybe a sessionId filed as well. 
 - create a summary file (and/or decision log, maybe update a to-do file) on command
 - overhaul status
-- switch to deno and multi-agent structure
+- switch to deno and multi-agent structure with each agent monitoring a single source, and outputing to only allowed destinations
+- "::seal" command : sign, hash, and close a file

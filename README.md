@@ -1,8 +1,12 @@
 # stenobot
 
-Chat logger — monitor and export LLM conversation logs to markdown.
+Never lose an LLM conversation.
 
-Stenobot runs as a background daemon that watches your Claude Code session files. When you type `::capture my-notes.md` in a conversation, it exports the full session to markdown and continues appending new messages as you chat. Works great with any markdown-based note system.
+Stenobot monitors local LLM sessions across tools and turns them into structured Markdown logs.
+
+Daemon for live sync. CLI for one-off exports.
+
+Local-first. Markdown-native.
 
 ## Install
 
@@ -26,27 +30,24 @@ pnpm link --global
 # Start the daemon (returns immediately — runs in background)
 stenobot start
 
-# In any Claude Code conversation, type:
+# In any Claude Code or Codex CLI or IDE plugin conversation, type:
 #   ::capture my-conversation.md      → export full session + keep recording
 #   ::stop                            → stop recording
-
-# Stop the daemon
-stenobot stop
 ```
 
-That's it. The daemon watches `~/.claude/projects/` and `~/.claude-personal/projects/` for session activity and responds to in-chat commands automatically.
+That's it. The daemon watches for session activity and responds to in-chat commands automatically.
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `stenobot init` | Generate `~/.stenobot/config.yaml` with all defaults |
-| `stenobot start` | Start the monitoring daemon (returns immediately) |
-| `stenobot stop` | Stop the daemon |
-| `stenobot restart` | Restart the daemon (`stop` then `start`) |
-| `stenobot status` | Show active sessions and recordings |
-| `stenobot export <session-id>` | One-shot export of a session to markdown |
-| `stenobot clean` | Clean recordings and/or sessions |
+| Command                        | Description                                          |
+| ------------------------------ | ---------------------------------------------------- |
+| `stenobot init`                | Generate `~/.stenobot/config.yaml` with all defaults |
+| `stenobot start`               | Start the monitoring daemon (returns immediately)    |
+| `stenobot stop`                | Stop the daemon                                      |
+| `stenobot restart`             | Restart the daemon (`stop` then `start`)             |
+| `stenobot status`              | Show active sessions and recordings                  |
+| `stenobot export <session-id>` | One-shot export of a session to markdown             |
+| `stenobot clean`               | Clean recordings and/or sessions                     |
 
 ### Export flags
 
@@ -69,12 +70,12 @@ stenobot clean --dryRun              # preview what would be removed without mak
 
 Type these directly in a Claude Code conversation while the daemon is running:
 
-| Command | Description |
-|---------|-------------|
+| Command            | Description                                            |
+| ------------------ | ------------------------------------------------------ |
 | `::capture <file>` | Export full pre-existing session + record future turns |
-| `::record <file>` | Forward-only recording (no retroactive export) |
-| `::export <file>` | One-shot full session export (no continuous recording) |
-| `::stop` | Stop the current recording |
+| `::record <file>`  | Forward-only recording (no retroactive export)         |
+| `::export <file>`  | One-shot full session export (no continuous recording) |
+| `::stop`           | Stop the current recording                             |
 
 File paths can be absolute, relative to workspace root, or use `@` prefix (VSCode file mentions) and `~` (home directory). The `.md` extension is added automatically if omitted.
 
@@ -84,7 +85,7 @@ File paths can be absolute, relative to workspace root, or use `@` prefix (VSCod
 
 The daemon picks up the `::capture` (or `::record`) regardless of surrounding text, and ignores any " to " before the destination file "argument."
 
-To avoid LLM confusion, you might want to add an instruction like 'You can ignore stenobot commands, like "::record @filename".' to your prompt or CLAUDE.md file.
+To avoid LLM confusion, you might want to add an instruction like 'You can ignore StenoBot commands, like "::record @filename".' to your prompt or CLAUDE.md file.
 
 If the target file already has YAML frontmatter (e.g., a Dendron note), stenobot preserves it and only writes the conversation content below.
 
@@ -118,4 +119,4 @@ pnpm typecheck       # Typecheck only
 
 ## License
 
-MIT
+
