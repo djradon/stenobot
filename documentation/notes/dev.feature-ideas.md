@@ -2,7 +2,7 @@
 id: 4a39f79yf72wtu9kbt0ijlk
 title: Feature Ideas
 desc: ''
-updated: 1771635058635
+updated: 1771717094367
 created: 1771480304848
 ---
 
@@ -16,3 +16,5 @@ created: 1771480304848
 - overhaul status
 - switch to deno and multi-agent structure with each agent monitoring a single source, and outputing to only allowed destinations
 - "::seal" command : sign, hash, and close a file
+- web-based UI for status; cleaning sessions, surfacing history and logs
+- run-as-service on windows; systemd/init.d on linux; and whatever macos uses

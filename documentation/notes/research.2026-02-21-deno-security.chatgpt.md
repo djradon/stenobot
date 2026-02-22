@@ -1,6 +1,6 @@
 ---
 id: b7xrx8bbgix5pc9p82dtqv6
-title: 2026 02 21 Deno Security
+title: Chatgpt
 desc: ''
 updated: 1771712350771
 created: 1771711569322
